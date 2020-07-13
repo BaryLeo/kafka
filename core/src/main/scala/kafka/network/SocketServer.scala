@@ -68,11 +68,20 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
   private val memoryPoolDepletedTimeMetricName = metrics.metricName("MemoryPoolDepletedTimeTotal", "socket-server-metrics")
   memoryPoolSensor.add(new Meter(TimeUnit.MILLISECONDS, memoryPoolDepletedPercentMetricName, memoryPoolDepletedTimeMetricName))
   private val memoryPool = if (config.queuedMaxBytes > 0) new SimpleMemoryPool(config.queuedMaxBytes, config.socketRequestMaxBytes, false, memoryPoolSensor) else MemoryPool.NONE
+  /**
+   * Processor与Handler之间交换数据的队列.
+   */
   val requestChannel = new RequestChannel(maxQueuedRequests)
   private val processors = new ConcurrentHashMap[Int, Processor]()
   private var nextProcessorId = 0
-
+  /**
+   * 各EndPoint对应的Acceptor(Acceptor其实就是处理ACCEPT事件的线程),
+   * 其中EndPoint代表一个监听IP:Port
+   */
   private[network] val acceptors = new ConcurrentHashMap[EndPoint, Acceptor]()
+  /**
+   * 控制每个IP上的最大连接数
+   */
   private var connectionQuotas: ConnectionQuotas = _
   private var stoppedProcessingRequests = false
 
@@ -91,7 +100,9 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
   def startup(startupProcessors: Boolean = true) {
     this.synchronized {
       connectionQuotas = new ConnectionQuotas(maxConnectionsPerIp, maxConnectionsPerIpOverrides)
+      // 监听端口, 并创建处理Accept事件的Acceptor线程
       createAcceptorAndProcessors(config.numNetworkThreads, config.listeners)
+      // 启动各Acceptor对应的Processor线程
       if (startupProcessors) {
         startProcessors()
       }
@@ -133,6 +144,9 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
     info(s"Started processors for ${acceptors.size} acceptors")
   }
 
+  /**
+   * 监听的Ip:Port列表
+   */
   private def endpoints = config.listeners.map(l => l.listenerName -> l).toMap
 
   private def createAcceptorAndProcessors(processorsPerListener: Int,
@@ -488,6 +502,12 @@ private[kafka] object Processor {
 /**
  * Thread that processes all requests from a single connection. There are N of these running in parallel
  * each of which has its own selector
+ *
+ * Processor主要负责两个任务:
+ * 1. 请求读取;
+ * 2. 响应回写.
+ *
+ * 聚体法人业务逻辑由Handler负责.
  */
 private[kafka] class Processor(val id: Int,
                                time: Time,
@@ -519,8 +539,17 @@ private[kafka] class Processor(val id: Int,
     override def toString: String = s"$localHost:$localPort-$remoteHost:$remotePort-$index"
   }
 
+  /**
+   * 当前Processor所负责的连接集合
+   */
   private val newConnections = new ConcurrentLinkedQueue[SocketChannel]()
+  /**
+   * 尚未发送的响应
+   */
   private val inflightResponses = mutable.Map[String, RequestChannel.Response]()
+  /**
+   * Handler推来的Response对象
+   */
   private val responseQueue = new LinkedBlockingDeque[RequestChannel.Response]()
 
   private[kafka] val metricTags = mutable.LinkedHashMap(
