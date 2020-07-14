@@ -72,7 +72,17 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
    * Processor与Handler之间交换数据的队列.
    */
   val requestChannel = new RequestChannel(maxQueuedRequests)
+  /**
+   * Processor线程集合.
+   *
+   * 0到(config.numNetworkThreads - 1)号Processor会分配个0号Acceptor;
+   * (config.numNetworkThreads)到(2 * config.numNetworkThreads - 1)号Processor会分配给1号Acceptor;
+   * 以此类推.
+   */
   private val processors = new ConcurrentHashMap[Int, Processor]()
+  /**
+   * 初始化时使用,指示下一个创建的Processor的Id值
+   */
   private var nextProcessorId = 0
   /**
    * 各EndPoint对应的Acceptor(Acceptor其实就是处理ACCEPT事件的线程),
@@ -403,9 +413,11 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
                 iter.remove()
                 if (key.isAcceptable) {
                   val processor = synchronized {
+                    // Round-Robin策略分配Processor
                     currentProcessor = currentProcessor % processors.size
                     processors(currentProcessor)
                   }
+                  // 最终调用Processor.accept方法将当前连接加入到Processor的"负责集合"
                   accept(key, processor)
                 } else
                   throw new IllegalStateException("Unrecognized key state for acceptor thread.")
@@ -507,7 +519,9 @@ private[kafka] object Processor {
  * 1. 请求读取;
  * 2. 响应回写.
  *
- * 聚体法人业务逻辑由Handler负责.
+ * 具体业务逻辑由Handler负责(Handler已是API层的概念).
+ *
+ * 一个Processor可负责多个连接.
  */
 private[kafka] class Processor(val id: Int,
                                time: Time,
@@ -610,6 +624,7 @@ private[kafka] class Processor(val id: Int,
           configureNewConnections()
           // register any new responses for writing
           processNewResponses()
+          // 只是selector.poll(300)的包装
           poll()
           processCompletedReceives()
           processCompletedSends()

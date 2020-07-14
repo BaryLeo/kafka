@@ -275,6 +275,12 @@ object RequestChannel extends Logging {
 class RequestChannel(val queueSize: Int) extends KafkaMetricsGroup {
   import RequestChannel._
   val metrics = new RequestChannel.Metrics
+  /**
+   * Processor解析出的请求列表, 需要Handler来进行消费.
+   *
+   * 旧版本还对应存在一个responseQueue,
+   * 不过现在Response列表改为直接维护在Processor中.
+   */
   private val requestQueue = new ArrayBlockingQueue[BaseRequest](queueSize)
   private val processors = new ConcurrentHashMap[Int, Processor]()
 
