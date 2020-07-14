@@ -42,9 +42,10 @@ import scala.math._
  *
  * A segment with a base offset of [base_offset] would be stored in two files, a [base_offset].index and a [base_offset].log file.
  *
- * @param log The file records containing log entries
- * @param offsetIndex The offset index
- * @param timeIndex The timestamp index
+ * @param log The file records containing log entries(日志分段数据文件)
+ * @param offsetIndex The offset index(日志分段索引文件)
+ * @param timeIndex The timestamp index(时间戳索引)
+ * @param txnIndex 事务索引
  * @param baseOffset A lower bound on the offsets in this segment
  * @param indexIntervalBytes The approximate number of bytes between entries in the index
  * @param time The time instance

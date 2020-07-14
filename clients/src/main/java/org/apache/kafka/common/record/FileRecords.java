@@ -38,6 +38,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * A {@link Records} implementation backed by a file. An optional start and end position can be applied to this
  * instance to enable slicing a range of the log records.
+ *
+ * 表示基于文件的多个消息Record的集合.
+ *
+ * 备注:
+ * <pre>
+ * 1. 不一定是整个日志分段数据文件, 可能为分段数据文件的一个"切片";
+ * 2. 不基于mmap, 直接读写;
+ * </pre>
  */
 public class FileRecords extends AbstractRecords implements Closeable {
     private final boolean isSlice;
