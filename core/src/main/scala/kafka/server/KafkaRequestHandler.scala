@@ -31,6 +31,8 @@ import scala.collection.mutable
 
 /**
  * A thread that answers kafka requests.
+ *
+ * 以KafkaRequestHandlerPool形式维护在{@link kafka.server.KafkaServer}
  */
 class KafkaRequestHandler(id: Int,
                           brokerId: Int,
@@ -66,6 +68,7 @@ class KafkaRequestHandler(id: Int,
           try {
             request.requestDequeueTimeNanos = endTime
             trace(s"Kafka request handler $id on broker $brokerId handling request $request")
+            // 分派Request
             apis.handle(request)
           } catch {
             case e: FatalExitError =>
