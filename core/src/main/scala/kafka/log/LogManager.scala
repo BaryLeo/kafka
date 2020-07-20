@@ -44,6 +44,8 @@ import scala.collection.mutable.ArrayBuffer
  * size or I/O rate.
  *
  * A background thread handles log retention by periodically truncating excess log segments.
+ *
+ * 日志存储层的入口, 管理多个Log(即Partition)
  */
 @threadsafe
 class LogManager(logDirs: Seq[File],
@@ -390,18 +392,21 @@ class LogManager(logDirs: Seq[File],
   def startup() {
     /* Schedule the cleanup task to delete old logs */
     if (scheduler != null) {
+      // 日志段清理任务(根据每个LogSegment的存活时间 & 整个Log的size)
       info("Starting log cleanup with a period of %d ms.".format(retentionCheckMs))
       scheduler.schedule("kafka-log-retention",
                          cleanupLogs _,
                          delay = InitialTaskDelayMs,
                          period = retentionCheckMs,
                          TimeUnit.MILLISECONDS)
+      // Log定时刷盘任务(除了定时刷盘外，Log.append方法内也会根据未刷盘消息数量来判断是否需要flush)
       info("Starting log flusher with a default period of %d ms.".format(flushCheckMs))
       scheduler.schedule("kafka-log-flusher",
                          flushDirtyLogs _,
                          delay = InitialTaskDelayMs,
                          period = flushCheckMs,
                          TimeUnit.MILLISECONDS)
+      // 定时将每个Log的recoveryPoint写入RecoveryPointCheckpoint文件
       scheduler.schedule("kafka-recovery-point-checkpoint",
                          checkpointLogRecoveryOffsets _,
                          delay = InitialTaskDelayMs,

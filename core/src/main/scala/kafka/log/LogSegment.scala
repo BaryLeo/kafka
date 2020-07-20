@@ -42,6 +42,13 @@ import scala.math._
  *
  * A segment with a base offset of [base_offset] would be stored in two files, a [base_offset].index and a [base_offset].log file.
  *
+ * 实际上一个LogSegment对应两类文件:
+ * 1. 数据文件(xxx.log);
+ * 2. 索引文件
+ *   a. OffsetIndex;
+ *   b. TimeIndex;
+ *   c. TransactionIndex
+ *
  * @param log The file records containing log entries(日志分段数据文件)
  * @param offsetIndex The offset index(日志分段索引文件)
  * @param timeIndex The timestamp index(时间戳索引)
@@ -86,9 +93,16 @@ class LogSegment private[log] (val log: FileRecords,
     else throw new NoSuchFileException(s"Offset index file ${offsetIndex.file.getAbsolutePath} does not exist")
   }
 
+  /**
+   * LogSegment对象创建时间
+   */
   private var created = time.milliseconds
 
-  /* the number of bytes since we last added an entry in the offset index */
+  /**
+   * the number of bytes since we last added an entry in the offset index.
+   *
+   * 自从上一次添加索引项, 有有多少bytes的新消息存进来, 用于判断添加索引项的时机.
+   */
   private var bytesSinceLastIndexEntry = 0
 
   /* The timestamp we used for time based log rolling */
