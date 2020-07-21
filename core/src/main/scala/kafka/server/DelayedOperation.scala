@@ -42,6 +42,12 @@ import scala.collection.mutable.ListBuffer
  * forceComplete().
  *
  * A subclass of DelayedOperation needs to provide an implementation of both onComplete() and tryComplete().
+ *
+ * 重要子类有:
+ * 1. DelayedProduce;
+ * 2. DelayedFetch;
+ * 3. DelayedJoin;
+ * 4. DelayedHeartbeat
  */
 abstract class DelayedOperation(override val delayMs: Long,
     lockOpt: Option[Lock] = None) extends TimerTask with Logging {
@@ -51,7 +57,7 @@ abstract class DelayedOperation(override val delayMs: Long,
   // Visible for testing
   private[server] val lock: Lock = lockOpt.getOrElse(new ReentrantLock)
 
-  /*
+  /**
    * Force completing the delayed operation, if not already completed.
    * This function can be triggered when
    *
@@ -62,6 +68,10 @@ abstract class DelayedOperation(override val delayMs: Long,
    * concurrent threads can try to complete the same operation, but only
    * the first thread will succeed in completing the operation and return
    * true, others will still return false
+   *
+   * 强制complete:
+   * 1. 将该任务从时间轮中删除;
+   * 2. 调用onComplete();
    */
   def forceComplete(): Boolean = {
     if (completed.compareAndSet(false, true)) {

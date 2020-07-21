@@ -51,20 +51,39 @@ trait Timer {
   def shutdown(): Unit
 }
 
+/**
+ * 定时器
+ *
+ * @param executorName 用于taskExecutor内Thread的name
+ * @param tickMs 时间精度(最底层时间轮一个单元格的时间跨度)
+ * @param wheelSize 每层时间轮的单元格数量
+ * @param startMs 创建时间
+ */
 @threadsafe
 class SystemTimer(executorName: String,
                   tickMs: Long = 1,
                   wheelSize: Int = 20,
                   startMs: Long = Time.SYSTEM.hiResClockMs) extends Timer {
 
-  // timeout timer
+  /**
+   * timeout timer.
+   *
+   * 任务执行器, 已到期的任务会被submit到该线程池
+   */
   private[this] val taskExecutor = Executors.newFixedThreadPool(1, new ThreadFactory() {
     def newThread(runnable: Runnable): Thread =
       KafkaThread.nonDaemon("executor-"+executorName, runnable)
   })
 
   private[this] val delayQueue = new DelayQueue[TimerTaskList]()
+  /**
+   * 任务总数计数器,
+   * 该对象被各级时间轮共用
+   */
   private[this] val taskCounter = new AtomicInteger(0)
+  /**
+   * 最底层时间轮
+   */
   private[this] val timingWheel = new TimingWheel(
     tickMs = tickMs,
     wheelSize = wheelSize,
@@ -97,17 +116,31 @@ class SystemTimer(executorName: String,
 
   private[this] val reinsert = (timerTaskEntry: TimerTaskEntry) => addTimerTaskEntry(timerTaskEntry)
 
-  /*
+  /**
    * Advances the clock if there is an expired bucket. If there isn't any expired bucket when called,
    * waits up to timeoutMs before giving up.
+   *
+   * 推进currentTime. 若产生了到期任务, 则交由taskExecutor来执行.
+   *
+   * @param timeoutMs 等待单元格到期的最大阻塞时间
    */
   def advanceClock(timeoutMs: Long): Boolean = {
     var bucket = delayQueue.poll(timeoutMs, TimeUnit.MILLISECONDS)
     if (bucket != null) {
       writeLock.lock()
       try {
+        // 拉到了bucket,说明TimerTaskList已到期
         while (bucket != null) {
+          // 从下至上推进各级时间轮的currentTime
           timingWheel.advanceClock(bucket.getExpiration())
+          /*
+           * TimerTaskList到期,但其内的部分TimerTaskEntry可能没到期,
+           * 将其中没到期的TimerTaskEntry拉出来重新由底层时间轮执行add操作,
+           * 使得其落到了原时间轮的下一层.
+           *
+           * 至于已到期的TimerTaskEntry, 会在此次迭代中交由taskExecutor来执行
+           * (见SystemTimer.addTimerTaskEntry方法)
+           */
           bucket.flush(reinsert)
           bucket = delayQueue.poll()
         }

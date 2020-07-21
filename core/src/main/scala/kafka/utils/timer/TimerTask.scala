@@ -16,8 +16,20 @@
  */
 package kafka.utils.timer
 
+/**
+ * 类派生层次结构:
+ * TimerTask
+ * |--DelayedOperation
+ *    |--DelayedProduce
+ *    |--DelayedFetch
+ *    |--DelayedJoin
+ *    |--DelayedHeartbeat
+ */
 trait TimerTask extends Runnable {
-
+  /**
+   * 该任务自创建那一刻起, 多少毫秒后到期
+   * (相对时间).
+   */
   val delayMs: Long // timestamp in millisecond
 
   private[this] var timerTaskEntry: TimerTaskEntry = null

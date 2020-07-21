@@ -21,7 +21,7 @@ import kafka.utils.nonthreadsafe
 import java.util.concurrent.DelayQueue
 import java.util.concurrent.atomic.AtomicInteger
 
-/*
+/**
  * Hierarchical Timing Wheels
  *
  * A simple timing wheel is a circular list of buckets of timer tasks. Let u be the time unit.
@@ -95,17 +95,36 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * This class is not thread-safe. There should not be any add calls while advanceClock is executing.
  * It is caller's responsibility to enforce it. Simultaneous add calls are thread-safe.
+
+ *
+ * @param tickMs 单个时间单元格代表的时间跨度
+ * @param wheelSize 当前时间轮的单元格数量
+ * @param startMs 时间轮创建时间
+ * @param taskCounter 各级时间轮内包含的任务总数
+ * @param queue TimerTaskList的延迟队列;
+ *              用于在无时间单元格过期时阻塞"时间推进"线程
+ *              (见DelayedOperationPurgatory.ExpiredOperationReaper).
  */
 @nonthreadsafe
 private[timer] class TimingWheel(tickMs: Long, wheelSize: Int, startMs: Long, taskCounter: AtomicInteger, queue: DelayQueue[TimerTaskList]) {
-
+  /**
+   * 当前时间轮所能表示的最大时间跨度
+   */
   private[this] val interval = tickMs * wheelSize
+  /**
+   * 时间轮上的单元格列表, 每一项都是TimerTaskList类型
+   */
   private[this] val buckets = Array.tabulate[TimerTaskList](wheelSize) { _ => new TimerTaskList(taskCounter) }
-
+  /**
+   * "当前时间"指针, 最小精度为tickMs
+   */
   private[this] var currentTime = startMs - (startMs % tickMs) // rounding down to multiple of tickMs
 
   // overflowWheel can potentially be updated and read by two concurrent threads through add().
   // Therefore, it needs to be volatile due to the issue of Double-Checked Locking pattern with JVM
+  /**
+   * 上层时间轮
+   */
   @volatile private[this] var overflowWheel: TimingWheel = null
 
   private[this] def addOverflowWheel(): Unit = {
@@ -134,10 +153,19 @@ private[timer] class TimingWheel(tickMs: Long, wheelSize: Int, startMs: Long, ta
     } else if (expiration < currentTime + interval) {
       // Put in its own bucket
       val virtualId = expiration / tickMs
+      // bucket为TimerTaskList类型
       val bucket = buckets((virtualId % wheelSize.toLong).toInt)
       bucket.add(timerTaskEntry)
 
-      // Set the bucket expiration time
+      /*
+       * Set the bucket expiration time.
+       * 设TimerTaskEntry.expirationMs被裁剪为tickMs倍数后的值为T,
+       * TimerTaskList.expiration在此次add操作中会被设为Y.
+       * T小于等于TimerTaskEntry.expirationMs.
+       *
+       * 若TimerTaskList.expiration的值此次发生了变化, 说明时间轮已经转完一圈,
+       * 该TimerTaskList被reused, 要重新入队.
+       */
       if (bucket.setExpiration(virtualId * tickMs)) {
         // The bucket needs to be enqueued because it was an expired bucket
         // We only need to enqueue the bucket when its expiration time has changed, i.e. the wheel has advanced
@@ -147,14 +175,19 @@ private[timer] class TimingWheel(tickMs: Long, wheelSize: Int, startMs: Long, ta
         queue.offer(bucket)
       }
       true
-    } else {
+    } else {// 当前时间轮容不下, 需要添加到上层时间轮
       // Out of the interval. Put it into the parent timer
-      if (overflowWheel == null) addOverflowWheel()
+      if (overflowWheel == null) addOverflowWheel()//如果当前不存在上层时间轮, 那么生成一个
       overflowWheel.add(timerTaskEntry)
     }
   }
 
-  // Try to advance the clock
+  /**
+   * Try to advance the clock.
+   * 推进当前时间轮的currentTime指针.
+   *
+   * @param timeMs 当前时间戳
+   */
   def advanceClock(timeMs: Long): Unit = {
     if (timeMs >= currentTime + tickMs) {
       currentTime = timeMs - (timeMs % tickMs)
