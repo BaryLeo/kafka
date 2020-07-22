@@ -43,9 +43,11 @@ import scala.collection.mutable.ListBuffer
  *
  * A subclass of DelayedOperation needs to provide an implementation of both onComplete() and tryComplete().
  *
+ * DelayOperation是指"最多延迟给定时间,但必然被执行的操作", 并没有"成功"与"失败"的概念.
+ *
  * 重要子类有:
- * 1. DelayedProduce;
- * 2. DelayedFetch;
+ * 1. DelayedProduce: 延迟一定时间后判断给Producer返回Success响应 or ERROR响应;
+ * 2. DelayedFetch: 延迟一定时间后再向Consumer返回数据;
  * 3. DelayedJoin;
  * 4. DelayedHeartbeat
  */
@@ -76,7 +78,7 @@ abstract class DelayedOperation(override val delayMs: Long,
   def forceComplete(): Boolean = {
     if (completed.compareAndSet(false, true)) {
       // cancel the timeout timer
-      cancel()
+      cancel()//remove from TimeWheel
       onComplete()
       true
     } else {
@@ -423,8 +425,9 @@ final class DelayedOperationPurgatory[T <: DelayedOperation](purgatoryName: Stri
   }
 
   def advanceClock(timeoutMs: Long) {
+    // 1. 推动时间,触发到期的操作
     timeoutTimer.advanceClock(timeoutMs)
-
+    // 2. 清理watchersForKey中已被提前complete的任务(等待的条件在超时之前满足)
     // Trigger a purge if the number of completed but still being watched operations is larger than
     // the purge threshold. That number is computed by the difference btw the estimated total number of
     // operations and the number of pending delayed operations.

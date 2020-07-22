@@ -483,9 +483,16 @@ class ReplicaManager(val config: KafkaConfig,
 
       recordConversionStatsCallback(localProduceResults.mapValues(_.info.recordConversionStats))
 
+      /*
+       * 判定是否需要创建DelayProduce, 标准如下
+       *   a. required acks = -1
+       *   b. there is data to append
+       *   c. at least one partition append was successful (fewer errors than partitions)
+       */
       if (delayedProduceRequestRequired(requiredAcks, entriesPerPartition, localProduceResults)) {
         // create delayed produce operation
         val produceMetadata = ProduceMetadata(requiredAcks, produceStatus)
+        // 这里的timeout是由ProduceRequest指定的
         val delayedProduce = new DelayedProduce(timeout, produceMetadata, this, responseCallback, delayedProduceLock)
 
         // create a list of (topic, partition) pairs to use as keys for this delayed produce operation

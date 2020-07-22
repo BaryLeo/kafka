@@ -52,7 +52,10 @@ trait Timer {
 }
 
 /**
- * 定时器
+ * "定时器".
+ * 其本质就是时间轮数据结构的一个门面封装, 自身并不具备推动时间的能力.
+ *
+ * 至于"时间推动", 可参考DelayedOperationPurgatory.ExpiredOperationReaper
  *
  * @param executorName 用于taskExecutor内Thread的name
  * @param tickMs 时间精度(最底层时间轮一个单元格的时间跨度)
