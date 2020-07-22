@@ -793,6 +793,10 @@ class ReplicaManager(val config: KafkaConfig,
   /**
    * Fetch messages from the leader replica, and wait until enough data can be fetched and return;
    * the callback function will be triggered either when timeout or required fetch info is satisfied
+   *
+   * @param timeout 最大等待时间(由FetchRequest指定)
+   * @param fetchMinBytes 返回的最小数据集大小(由FetchRequest指定)
+   * @param fetchMaxBytes 返回的最大数据集大小(由FetchRequest指定)
    */
   def fetchMessages(timeout: Long,
                     replicaId: Int,
@@ -803,6 +807,7 @@ class ReplicaManager(val config: KafkaConfig,
                     quota: ReplicaQuota = UnboundedQuota,
                     responseCallback: Seq[(TopicPartition, FetchPartitionData)] => Unit,
                     isolationLevel: IsolationLevel) {
+    // Follower副本有replicaId, 而消费者没有(-1)(replicaId由FetchRequest指定)
     val isFromFollower = Request.isValidBrokerId(replicaId)
     val fetchOnlyFromLeader = replicaId != Request.DebuggingConsumerId && replicaId != Request.FutureLocalReplicaId
     val fetchOnlyCommitted = !isFromFollower && replicaId != Request.FutureLocalReplicaId
@@ -817,6 +822,7 @@ class ReplicaManager(val config: KafkaConfig,
         readPartitionInfo = fetchInfos,
         quota = quota,
         isolationLevel = isolationLevel)
+      // 若FetchRequest来自于Follower, 则调用updateFollowerLogReadResults来维护ISR状态
       if (isFromFollower) updateFollowerLogReadResults(replicaId, result)
       else result
     }
@@ -833,6 +839,7 @@ class ReplicaManager(val config: KafkaConfig,
     //                        2) fetch request does not require any data
     //                        3) has enough data to respond
     //                        4) some error happens while reading data
+    // 若不够立即返回的条件, 则创建DelayedFetch
     if (timeout <= 0 || fetchInfos.isEmpty || bytesReadable >= fetchMinBytes || errorReadingData) {
       val fetchPartitionData = logReadResults.map { case (tp, result) =>
         tp -> FetchPartitionData(result.error, result.highWatermark, result.leaderLogStartOffset, result.info.records,
