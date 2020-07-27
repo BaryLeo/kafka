@@ -26,6 +26,13 @@ class ReplicaFetcherManager(brokerConfig: KafkaConfig, protected val replicaMana
       extends AbstractFetcherManager("ReplicaFetcherManager on broker " + brokerConfig.brokerId,
         "Replica", brokerConfig.numReplicaFetchers) {
 
+  /**
+   * 这里创建出来的Thread最终会被维护在AbstractFetcherManager.fetcherThreadMap内
+   *
+   * @param fetcherId
+   * @param sourceBroker
+   * @return
+   */
   override def createFetcherThread(fetcherId: Int, sourceBroker: BrokerEndPoint): AbstractFetcherThread = {
     val prefix = threadNamePrefix.map(tp => s"${tp}:").getOrElse("")
     val threadName = s"${prefix}ReplicaFetcherThread-$fetcherId-${sourceBroker.id}"

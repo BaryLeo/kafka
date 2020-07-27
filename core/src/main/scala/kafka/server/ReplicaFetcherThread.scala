@@ -127,7 +127,11 @@ class ReplicaFetcherThread(name: String,
     }
   }
 
-  // process fetched data
+  /**
+   *  process fetched data.
+   *
+   *  存储FetchRequest返回的数据的同时更新Follower副本HW
+   */
   def processPartitionData(topicPartition: TopicPartition, fetchOffset: Long, partitionData: PartitionData) {
     val replica = replicaMgr.getReplicaOrException(topicPartition)
     val partition = replicaMgr.getPartition(topicPartition).get

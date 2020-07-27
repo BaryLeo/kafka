@@ -54,6 +54,19 @@ object KafkaController extends Logging {
 
 }
 
+/**
+ * KafkaController负责管理集群相关信息, 重点职责如下:
+ * 1. 负责主副本选取, 并通过LeaderAndIsrRequest来通知相关Broker;
+ * 2. 将集群元数据的变更推送至各Broker, 以更新各Broker缓存的集群元数据(UpdateMetadataRequest);
+ *
+ * @param config
+ * @param zkClient
+ * @param time
+ * @param metrics
+ * @param initialBrokerInfo
+ * @param tokenManager
+ * @param threadNamePrefix
+ */
 class KafkaController(val config: KafkaConfig, zkClient: KafkaZkClient, time: Time, metrics: Metrics, initialBrokerInfo: BrokerInfo,
                       tokenManager: DelegationTokenManager, threadNamePrefix: Option[String] = None) extends Logging with KafkaMetricsGroup {
 
