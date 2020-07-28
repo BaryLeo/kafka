@@ -55,7 +55,10 @@ object KafkaController extends Logging {
 }
 
 /**
- * KafkaController负责管理集群相关信息, 重点职责如下:
+ * KafkaController负责管理集群相关信息.
+ * KafkaController是Kafka集群与ZK的连接点, 其监听ZK数据节点, 并根据数据变化调整集群状态.
+ *
+ * 重点职责如下:
  * 1. 负责主副本选取, 并通过LeaderAndIsrRequest来通知相关Broker;
  * 2. 将集群元数据的变更推送至各Broker, 以更新各Broker缓存的集群元数据(UpdateMetadataRequest);
  *
@@ -75,6 +78,16 @@ class KafkaController(val config: KafkaConfig, zkClient: KafkaZkClient, time: Ti
   @volatile private var brokerInfo = initialBrokerInfo
 
   private val stateChangeLogger = new StateChangeLogger(config.brokerId, inControllerContext = true, None)
+  /**
+   * 维护了KafkaController的数据上下文.
+   * KafkaController所处位置如下
+   * ┌────┐     ┌─────────────────┐     ┌─────────┐
+   * │ ZK │-----│ KafkaController │-----│ Brokers │
+   * └────┘     └─────────────────┘     └─────────┘
+   * 故其涉及的上下文可大体分为两部分:
+   * 1. ZK数据缓存;
+   * 2. 和Broker间的通信;
+   */
   val controllerContext = new ControllerContext
 
   // have a separate scheduler for the controller to be able to start and stop independently of the kafka server
@@ -86,8 +99,17 @@ class KafkaController(val config: KafkaConfig, zkClient: KafkaZkClient, time: Ti
     controllerContext.stats.rateAndTimeMetrics, _ => updateMetrics())
 
   val topicDeletionManager = new TopicDeletionManager(this, eventManager, zkClient)
+  /**
+   * 实现Controller和Broker间请求的批量发送
+   */
   private val brokerRequestBatch = new ControllerBrokerRequestBatch(this, stateChangeLogger)
+  /**
+   * 维护所有副本的状态机
+   */
   val replicaStateMachine = new ReplicaStateMachine(config, stateChangeLogger, controllerContext, topicDeletionManager, zkClient, mutable.Map.empty, new ControllerBrokerRequestBatch(this, stateChangeLogger))
+  /**
+   * 维护所有分区的状态机
+   */
   val partitionStateMachine = new PartitionStateMachine(config, stateChangeLogger, controllerContext, topicDeletionManager, zkClient, mutable.Map.empty, new ControllerBrokerRequestBatch(this, stateChangeLogger))
 
   private val controllerChangeHandler = new ControllerChangeHandler(this, eventManager)

@@ -25,18 +25,49 @@ import scala.collection.{Seq, Set, mutable}
 class ControllerContext {
   val stats = new ControllerStats
 
+  /*------------KafkaController - Broker--------------*/
+  /**
+   * 管理KafkaController和Broker间的通信
+   */
   var controllerChannelManager: ControllerChannelManager = null
 
+  /*------------KafkaController - ZK--------------*/
+  /**
+   * 正在关闭的Broker列表
+   */
   var shuttingDownBrokerIds: mutable.Set[Int] = mutable.Set.empty
+  /**
+   * Controller的年代信息
+   */
   var epoch: Int = KafkaController.InitialControllerEpoch - 1
   var epochZkVersion: Int = KafkaController.InitialControllerEpochZkVersion - 1
+  /**
+   * 整个集群的Topic列表
+   */
   var allTopics: Set[String] = Set.empty
+  /**
+   * 各Partition的AR集合
+   */
   private var partitionReplicaAssignmentUnderlying: mutable.Map[String, mutable.Map[Int, Seq[Int]]] = mutable.Map.empty
+  /**
+   * 记录了每个Leader副本的信息
+   * (所在BrokerId, ISR, controller_epoch等等)
+   */
   val partitionLeadershipInfo: mutable.Map[TopicPartition, LeaderIsrAndControllerEpoch] = mutable.Map.empty
+  /**
+   * 正在分配副本的Partition列表
+   */
   val partitionsBeingReassigned: mutable.Map[TopicPartition, ReassignedPartitionsContext] = mutable.Map.empty
   val replicasOnOfflineDirs: mutable.Map[Int, Set[TopicPartition]] = mutable.Map.empty
 
+  /*------------集群节点列表--------------*/
+  /**
+   * 当前存活的Broker列表
+   */
   private var liveBrokersUnderlying: Set[Broker] = Set.empty
+  /**
+   * 当前存活的Broker的Id列表
+   */
   private var liveBrokerIdsUnderlying: Set[Int] = Set.empty
 
   def partitionReplicaAssignment(topicPartition: TopicPartition): Seq[Int] = {

@@ -49,6 +49,10 @@ object ControllerChannelManager {
 class ControllerChannelManager(controllerContext: ControllerContext, config: KafkaConfig, time: Time, metrics: Metrics,
                                stateChangeLogger: StateChangeLogger, threadNamePrefix: Option[String] = None) extends Logging with KafkaMetricsGroup {
   import ControllerChannelManager._
+
+  /**
+   * 维护KafkaController与各Broker间的连接状态
+   */
   protected val brokerStateInfo = new HashMap[Int, ControllerBrokerStateInfo]
   private val brokerLock = new Object
   this.logIdent = "[Channel manager on controller " + config.brokerId + "]: "
@@ -220,6 +224,7 @@ class RequestSendThread(val controllerId: Int,
 
     def backoff(): Unit = pause(100, TimeUnit.MILLISECONDS)
 
+    // 从队列中获取待发送请求
     val QueueItem(apiKey, requestBuilder, callback, enqueueTimeMs) = queue.take()
     requestRateAndQueueTimeMetrics.update(time.milliseconds() - enqueueTimeMs, TimeUnit.MILLISECONDS)
 
@@ -232,6 +237,7 @@ class RequestSendThread(val controllerId: Int,
         try {
           if (!brokerReady()) {
             isSendSuccessful = false
+            // 等待100ms
             backoff()
           }
           else {
@@ -246,6 +252,7 @@ class RequestSendThread(val controllerId: Int,
               s"to broker $brokerNode. Reconnecting to broker.", e)
             networkClient.close(brokerNode.idString)
             isSendSuccessful = false
+            // 等待100ms
             backoff()
         }
       }
@@ -507,6 +514,15 @@ class ControllerBrokerRequestBatch(controller: KafkaController, stateChangeLogge
   }
 }
 
+/**
+ * KafkaController和特定Broker间的连接状态
+ * @param networkClient 维护KafkaController和Broker之间的网络连接
+ * @param brokerNode 维护Broker网络节点相关信息(如IP,Port等等)
+ * @param messageQueue 缓存待发往Broker的请求
+ * @param requestSendThread 请求发送线程
+ * @param queueSizeGauge
+ * @param requestRateAndTimeMetrics
+ */
 case class ControllerBrokerStateInfo(networkClient: NetworkClient,
                                      brokerNode: Node,
                                      messageQueue: BlockingQueue[QueueItem],
