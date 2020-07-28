@@ -57,7 +57,7 @@ abstract class AbstractFetcherThread(name: String,
   type PD <: PartitionData
 
   /**
-   * 记录了所负责的各Partition的同步状态
+   * 记录了所负责的各Partition的同步状态(TopicPartition->PartitionFetchState的映射)
    */
   private[server] val partitionStates = new PartitionStates[PartitionFetchState]
   private val partitionMapLock = new ReentrantLock
