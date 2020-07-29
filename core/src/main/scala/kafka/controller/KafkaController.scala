@@ -94,7 +94,14 @@ class KafkaController(val config: KafkaConfig, zkClient: KafkaZkClient, time: Ti
   // visible for testing
   private[controller] val kafkaScheduler = new KafkaScheduler(1)
 
-  // visible for testing
+  /**
+   * 异步事件处理.
+   * 其内部维护了一个"事件队列"和一个"事件消费线程".
+   *
+   * 可通过ControllerEventManager#put(kafka.controller.ControllerEvent)来向"事件队列"中添加事件;
+   * "事件消费线程"会不断地从队列中取事件,并调用事件内定义的process()方法来执行事件.
+   */
+  //visible for testing
   private[controller] val eventManager = new ControllerEventManager(config.brokerId,
     controllerContext.stats.rateAndTimeMetrics, _ => updateMetrics())
 
@@ -112,7 +119,14 @@ class KafkaController(val config: KafkaConfig, zkClient: KafkaZkClient, time: Ti
    */
   val partitionStateMachine = new PartitionStateMachine(config, stateChangeLogger, controllerContext, topicDeletionManager, zkClient, mutable.Map.empty, new ControllerBrokerRequestBatch(this, stateChangeLogger))
 
+  /**
+   * 监听Controller数据节点变化,时刻准备重新选举Controller
+   *
+   * 当前Broker无论是不是Controller,都会注册该Handler.
+   */
   private val controllerChangeHandler = new ControllerChangeHandler(this, eventManager)
+  // 下面几个Handler只有在当前Broker被选为KafkaController时才会被注册,
+  // 详情见onControllerFailover()回调(在当前Broker被选为Controller时被调用)
   private val brokerChangeHandler = new BrokerChangeHandler(this, eventManager)
   private val brokerModificationsHandlers: mutable.Map[Int, BrokerModificationsHandler] = mutable.Map.empty
   private val topicChangeHandler = new TopicChangeHandler(this, eventManager)
