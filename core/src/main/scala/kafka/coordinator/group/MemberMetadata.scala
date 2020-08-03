@@ -48,6 +48,15 @@ case class MemberSummary(memberId: String,
  * 2. Awaiting sync callback: when the group is in the awaiting-sync state, its sync callback
  *                            is kept in metadata until the leader provides the group assignment
  *                            and the group transitions to stable
+ *
+ * @param memberId 消费者Id(由GroupCoordinator分配)
+ * @param groupId 所属ConsumerGroup的Id
+ * @param clientId
+ * @param clientHost
+ * @param rebalanceTimeoutMs
+ * @param sessionTimeoutMs 心跳超时时间
+ * @param protocolType
+ * @param supportedProtocols 消费者所支持的PartitionAssignor
  */
 @nonthreadsafe
 private[group] class MemberMetadata(val memberId: String,
@@ -59,6 +68,9 @@ private[group] class MemberMetadata(val memberId: String,
                                     val protocolType: String,
                                     var supportedProtocols: List[(String, Array[Byte])]) {
 
+  /**
+   * 维护分配给当前Consumer的Partition信息
+   */
   var assignment: Array[Byte] = Array.empty[Byte]
   var awaitingJoinCallback: JoinGroupResult => Unit = null
   var awaitingSyncCallback: (Array[Byte], Errors) => Unit = null

@@ -165,6 +165,11 @@ case class CommitRecordMetadataAndOffset(appendedBatchOffset: Option[Long], offs
  *  1. group state
  *  2. generation id
  *  3. leader id
+ *
+ *  负责维护ConsumerGroup的"元信息"及在各Partition下的消费offset
+ *
+ * @param groupId groupId
+ * @param initialState 初始state
  */
 @nonthreadsafe
 private[group] class GroupMetadata(val groupId: String, initialState: GroupState) extends Logging {
@@ -172,11 +177,25 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
 
   private var state: GroupState = initialState
   var protocolType: Option[String] = None
+  /**
+   * 标识当前ConsumerGroup的年代信息
+   */
   var generationId = 0
+  /**
+   * 该ConsumerGroup中Leader消费者的Id
+   */
   private var leaderId: Option[String] = None
+  /**
+   * 该ConsumerGroup所选择的PartitionAssignor
+   */
   private var protocol: Option[String] = None
-
+  /**
+   * 该ConsumerGroup下的消费者元信息
+   */
   private val members = new mutable.HashMap[String, MemberMetadata]
+  /**
+   * 该ConsumerGroup在各Partition下的消费offset
+   */
   private val offsets = new mutable.HashMap[TopicPartition, CommitRecordMetadataAndOffset]
   private val pendingOffsetCommits = new mutable.HashMap[TopicPartition, OffsetAndMetadata]
   private val pendingTransactionalOffsetCommits = new mutable.HashMap[Long, mutable.Map[TopicPartition, CommitRecordMetadataAndOffset]]()

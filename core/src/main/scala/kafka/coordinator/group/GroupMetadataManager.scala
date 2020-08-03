@@ -47,6 +47,27 @@ import scala.collection.JavaConverters._
 import scala.collection._
 import scala.collection.mutable.ListBuffer
 
+/**
+ * 负责管理多个ConsumerGroup的元信息及各ConsumerGroup在各Partition上的消费offset。
+ *
+ * 值得一提的是"ConsumerGroup元信息"和"消费offset"都以"消息"的形式存储在`__consumer_offsets`这个Topic内.
+ * 虽然存储在同一个Topic内,但两类消息对应的key不同.(参考groupMetadataKey和offsetCommitKey两个方法)
+ * 默认配置下,该Topic有50个Partition,每个Partition有3个副本.
+ *
+ * 给定一个ConsumerGroup,其对应的两类数据会存储在同一个Partition内.
+ * 具体可参考partitionFor方法.
+ *
+ * 为了加速数据的查询,GroupMetadataManager会维护"消费offset"和"ConsumerGroup元数据"的缓存.
+ * 当Broker成为`__consumer_offsets`Topic某Partition的Leader时(见LeaderAndIsrRequest的处理),
+ * 会根据Partition内的消息将两类数据恢复至缓存. 数据有变动时会同步更新缓存和消息数据.
+ *
+ * @param brokerId BrokerId
+ * @param interBrokerProtocolVersion
+ * @param config
+ * @param replicaManager 副本管理器
+ * @param zkClient ZK客户端
+ * @param time
+ */
 class GroupMetadataManager(brokerId: Int,
                            interBrokerProtocolVersion: ApiVersion,
                            config: OffsetConfig,
@@ -70,10 +91,16 @@ class GroupMetadataManager(brokerId: Int,
   /* shutting down flag */
   private val shuttingDown = new AtomicBoolean(false)
 
-  /* number of partitions for the consumer metadata topic */
+  /**
+   * number of partitions for the consumer metadata topic
+   *
+   * Topic为`__consumer_offsets`
+   */
   private val groupMetadataTopicPartitionCount = getGroupMetadataTopicPartitionCount
 
-  /* single-thread scheduler to handle offset/group metadata cache loading and unloading */
+  /**
+   *  single-thread scheduler to handle offset/group metadata cache loading and unloading
+   */
   private val scheduler = new KafkaScheduler(threads = 1, threadNamePrefix = "group-metadata-manager-")
 
   /* The groups with open transactional offsets commits per producer. We need this because when the commit or abort
@@ -137,6 +164,7 @@ class GroupMetadataManager(brokerId: Int,
 
   def startup(enableMetadataExpiration: Boolean) {
     scheduler.startup()
+    // 启动groupMeta过期自动清理任务
     if (enableMetadataExpiration) {
       scheduler.schedule(name = "delete-expired-group-metadata",
         fun = cleanupGroupMetadata,
@@ -153,6 +181,11 @@ class GroupMetadataManager(brokerId: Int,
 
   def partitionFor(groupId: String): Int = Utils.abs(groupId.hashCode) % groupMetadataTopicPartitionCount
 
+  /**
+   * 检查给定ConsumerGroup是否由当前GroupCoordinator负责
+   * @param groupId group id
+   * @return
+   */
   def isGroupLocal(groupId: String): Boolean = isPartitionOwned(partitionFor(groupId))
 
   def isGroupLoading(groupId: String): Boolean = isPartitionLoading(partitionFor(groupId))
@@ -482,6 +515,10 @@ class GroupMetadataManager(brokerId: Int,
 
   /**
    * Asynchronously read the partition from the offsets topic and populate the cache
+   *
+   * 根据`__consumer_offsets`Topic下的消息将"消费offset"和"ConsumerGroup元数据"恢复至内存.
+   *
+   * 一次性任务,非定时调用,相当于将数据加载过程异步化.
    */
   def scheduleLoadGroupAndOffsets(offsetsPartition: Int, onGroupLoaded: GroupMetadata => Unit) {
     val topicPartition = new TopicPartition(Topic.GROUP_METADATA_TOPIC_NAME, offsetsPartition)
@@ -493,6 +530,12 @@ class GroupMetadataManager(brokerId: Int,
     }
   }
 
+  /**
+   * 针对当前GroupCoordinator所Lead的`__consumer_offsets`下的Partition,
+   * 从头至尾遍历消息,将"消费offset"和"ConsumerGroup元数据"两类数据加载至内存.
+   * @param topicPartition `__consumer_offsets`下的Partition
+   * @param onGroupLoaded load成功后的回调
+   */
   private[group] def loadGroupsAndOffsets(topicPartition: TopicPartition, onGroupLoaded: GroupMetadata => Unit) {
     try {
       val startMs = time.milliseconds()
@@ -574,6 +617,7 @@ class GroupMetadataManager(brokerId: Int,
                 require(record.hasKey, "Group metadata/offset entry key should not be null")
                 if (batchBaseOffset.isEmpty)
                   batchBaseOffset = Some(record.offset)
+                // 判断是"offset消息"还是"ConsumerGroup元数据"消息,并做不同处理
                 GroupMetadataManager.readMessageKey(record.key) match {
 
                   case offsetKey: OffsetKey =>
