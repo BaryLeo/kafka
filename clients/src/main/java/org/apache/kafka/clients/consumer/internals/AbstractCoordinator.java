@@ -104,19 +104,42 @@ public abstract class AbstractCoordinator implements Closeable {
     private final int sessionTimeoutMs;
     private final boolean leaveGroupOnClose;
     private final GroupCoordinatorMetrics sensors;
+    /**
+     * 心跳配置及当前状态
+     */
     private final Heartbeat heartbeat;
     protected final int rebalanceTimeoutMs;
+    /**
+     * 当前Consumer所属Group的id
+     */
     protected final String groupId;
+    /**
+     * 和Kafka集群间通信的基础设施
+     */
     protected final ConsumerNetworkClient client;
     protected final Time time;
     protected final long retryBackoffMs;
-
+    /**
+     * 异步定时发送心跳请求的线程
+     */
     private HeartbeatThread heartbeatThread = null;
+    /**
+     * 是否需要发送JoinGroupRequest
+     */
     private boolean rejoinNeeded = true;
+    /**
+     * 是否需要开始JoinGroupRequest请求前的准备工作
+     */
     private boolean needsJoinPrepare = true;
     private MemberState state = MemberState.UNJOINED;
     private RequestFuture<ByteBuffer> joinFuture = null;
+    /**
+     * 服务端GroupCoordinator所在节点
+     */
     private Node coordinator = null;
+    /**
+     * GroupCoordinator返回的年代信息, 主要作用于区分两次Rebalance操作
+     */
     private Generation generation = Generation.NO_GENERATION;
 
     private RequestFuture<Void> findCoordinatorFuture = null;
@@ -226,7 +249,9 @@ public abstract class AbstractCoordinator implements Closeable {
         long elapsedTime = 0L;
 
         while (coordinatorUnknown()) {
+            // 发送Coordinator位置查询请求(并将响应的处理者设为FindCoordinatorResponseHandler)
             final RequestFuture<Void> future = lookupCoordinator();
+            // 以timeoutMs超时等待查询请求返回
             client.poll(future, remainingTimeAtLeastZero(timeoutMs, elapsedTime));
             if (!future.isDone()) {
                 // ran out of time
@@ -1016,7 +1041,7 @@ public abstract class AbstractCoordinator implements Closeable {
                             disable();
                             continue;
                         }
-
+                        // 强制发送队列中的请求(其实这里这步操作的主要目的是心跳请求)
                         client.pollNoWakeup();
                         long now = time.milliseconds();
 
@@ -1038,8 +1063,9 @@ public abstract class AbstractCoordinator implements Closeable {
                             // coordinator disconnected
                             AbstractCoordinator.this.wait(retryBackoffMs);
                         } else {
+                            // 更新状态信息
                             heartbeat.sentHeartbeat(now);
-
+                            // 调用client.send方法使心跳请求入队 (每次循环开始时会调用poll)
                             sendHeartbeatRequest().addListener(new RequestFutureListener<Void>() {
                                 @Override
                                 public void onSuccess(Void value) {

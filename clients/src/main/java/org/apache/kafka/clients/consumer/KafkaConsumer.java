@@ -554,17 +554,39 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
     final Metrics metrics;
 
     private final Logger log;
+    /**
+     * 客户端Id
+     */
     private final String clientId;
+    /**
+     * 负责与服务端GroupCoordinator通信交互
+     */
     private final ConsumerCoordinator coordinator;
     private final Deserializer<K> keyDeserializer;
     private final Deserializer<V> valueDeserializer;
+    /**
+     * 负责从服务端拉取消息
+     */
     private final Fetcher<K, V> fetcher;
+    /**
+     * 拉取后消费前的拦截处理
+     */
     private final ConsumerInterceptors<K, V> interceptors;
 
     private final Time time;
+    /**
+     * 与服务端网络通信客户端
+     */
     private final ConsumerNetworkClient client;
+    /**
+     * 订阅状态
+     */
     private final SubscriptionState subscriptions;
+    /**
+     * Kafka集群元数据
+     */
     private final Metadata metadata;
+
     private final long retryBackoffMs;
     private final long requestTimeoutMs;
     private final int defaultApiTimeoutMs;

@@ -84,10 +84,16 @@ public class JoinGroupRequest extends AbstractRequest {
     public static final String UNKNOWN_MEMBER_ID = "";
 
     private final String groupId;
+    /**
+     * 若GroupCoordinator超过该时间限制未收到某消费者心跳, 则认为该消费者下线
+     */
     private final int sessionTimeout;
     private final int rebalanceTimeout;
     private final String memberId;
     private final String protocolType;
+    /**
+     * 本消费者所支持的PartitionAssignor的name和userData
+     */
     private final List<ProtocolMetadata> groupProtocols;
 
     public static class ProtocolMetadata {

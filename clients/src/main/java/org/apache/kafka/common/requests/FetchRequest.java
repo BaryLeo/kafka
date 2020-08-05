@@ -189,6 +189,10 @@ public class FetchRequest extends AbstractRequest {
     public static final int DEFAULT_RESPONSE_MAX_BYTES = Integer.MAX_VALUE;
     public static final long INVALID_LOG_START_OFFSET = -1L;
 
+    /**
+     * Follower副本Id.
+     * 对于Consumer, 该值为-1.
+     */
     private final int replicaId;
     private final int maxWait;
     private final int minBytes;
