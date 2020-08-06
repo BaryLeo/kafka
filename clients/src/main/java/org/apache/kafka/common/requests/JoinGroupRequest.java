@@ -92,12 +92,18 @@ public class JoinGroupRequest extends AbstractRequest {
     private final String memberId;
     private final String protocolType;
     /**
-     * 本消费者所支持的PartitionAssignor的name和userData
+     * 本消费者所支持的PartitionAssignor的name和序列化的订阅信息&用户自定义数据
      */
     private final List<ProtocolMetadata> groupProtocols;
 
     public static class ProtocolMetadata {
+        /**
+         * PartitionAssignor的name
+         */
         private final String name;
+        /**
+         * 序列化的订阅信息&用户自定义数据
+         */
         private final ByteBuffer metadata;
 
         public ProtocolMetadata(String name, ByteBuffer metadata) {
