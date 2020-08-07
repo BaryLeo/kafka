@@ -79,7 +79,13 @@ public final class RecordAccumulator {
     private final BufferPool free;
     private final Time time;
     private final ApiVersions apiVersions;
+    /**
+     * 按Partition组织的消息批队列
+     */
     private final ConcurrentMap<TopicPartition, Deque<ProducerBatch>> batches;
+    /**
+     * 未发送完的消息批集合
+     */
     private final IncompleteBatches incomplete;
     // The following variables are only accessed by the sender thread, so we don't need to protect them.
     private final Map<TopicPartition, Long> muted;
@@ -493,6 +499,7 @@ public final class RecordAccumulator {
      * @param maxSize The maximum number of bytes to drain
      * @param now The current unix time in milliseconds
      * @return A list of {@link ProducerBatch} for each node specified with total size less than the requested maxSize.
+     *         key为NodeId, value为消息批列表
      */
     public Map<Integer, List<ProducerBatch>> drain(Cluster cluster,
                                                    Set<Node> nodes,
@@ -556,7 +563,7 @@ public final class RecordAccumulator {
                                                 // in flight request count to 1.
                                                 break;
                                         }
-
+                                        // 只取每个Partition消息批队列的第一个元素,防止饥饿
                                         ProducerBatch batch = deque.pollFirst();
                                         if (producerIdAndEpoch != null && !batch.hasSequence()) {
                                             // If the batch already has an assigned sequence, then we should not change the producer id and

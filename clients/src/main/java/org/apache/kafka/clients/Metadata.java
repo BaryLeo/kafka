@@ -57,18 +57,45 @@ public final class Metadata implements Closeable {
     public static final long TOPIC_EXPIRY_MS = 5 * 60 * 1000;
     private static final long TOPIC_EXPIRY_NEEDS_UPDATE = -1L;
 
+    /**
+     * 两次元数据更新操作之间的最小时间间隔
+     */
     private final long refreshBackoffMs;
+    /**
+     * 每隔多长时间更新一次元数据
+     */
     private final long metadataExpireMs;
+    /**
+     * Kafka元数据版本号
+     */
     private int version;
+    /**
+     * 上次尝试更新元数据的时间戳
+     */
     private long lastRefreshMs;
+    /**
+     * 上一次成功更新元数据的时间戳
+     */
     private long lastSuccessfulRefreshMs;
     private AuthenticationException authenticationException;
+    /**
+     * Kafka集群元数据
+     */
     private Cluster cluster;
+    /**
+     * 是否需要强制更新元数据
+     */
     private boolean needUpdate;
     /* Topics with expiry time */
     private final Map<String, Long> topics;
+    /**
+     * 元数据变化监听器
+     */
     private final List<Listener> listeners;
     private final ClusterResourceListeners clusterResourceListeners;
+    /**
+     * 是否需要更新全部Topic对应的元数据
+     */
     private boolean needMetadataForAllTopics;
     private final boolean allowAutoTopicCreation;
     private final boolean topicExpiryEnabled;
