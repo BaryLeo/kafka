@@ -53,8 +53,8 @@ import scala.util.control.ControlThrowable
  *   Acceptor has N Processor threads that each have their own selector and read requests from sockets
  *   M Handler threads that handle requests and produce responses back to the processor threads for writing.
  *
- *   作为属性维护在`kafka.server.KafkaServer`, 为KafkaServer提供基础通信能力, 而KafkaServer则处理实际业务逻辑.
- *   二者的关系及内部结构如下:
+ *   SocketServer以Java原生的NIO为基础, 作为属性维护在`kafka.server.KafkaServer`, 为KafkaServer提供基础通信能力,
+ *   而KafkaServer则处理实际业务逻辑. 二者的关系及各自内部结构如下:
  *
  *                                                     引用
  *                               ┌───────────────────────────────────────────────┐
