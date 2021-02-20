@@ -53,7 +53,32 @@ import scala.util.control.ControlThrowable
  *   Acceptor has N Processor threads that each have their own selector and read requests from sockets
  *   M Handler threads that handle requests and produce responses back to the processor threads for writing.
  *
- *   维护在{@link kafka.server.KafkaServer}
+ *   作为属性维护在`kafka.server.KafkaServer`, 为KafkaServer提供基础通信能力, 而KafkaServer则处理实际业务逻辑.
+ *   二者的关系及内部结构如下:
+ *
+ *                                                     引用
+ *                               ┌───────────────────────────────────────────────┐
+ *                               ↓                                               │
+ *      ┌───────────────────────────────────────────────┐      ┌───────────────────────────────────┐
+ *      │ SocketServer                                  │      │ KafkaServer                       │
+ *      │                                               │      │  ┌─────────────────────────┐      │
+ *      │             ┌  Processor <─── ResponseQueue <─┼──────┼──┤ KafkaRequestHandlerPool │      │
+ *      │             │                                 │      │  │                         │      │
+ *      │             ├  Processor <─── ResponseQueue <─┼──────┼──┤   KafkaRequestHandler   │      │
+ *   ───┼──> Acceptor ┤                                 │      │  │                         │      │
+ *      │             │  ······                         │      │  │   KafkaRequestHandler   │      │
+ *      │             │                                 │      │  │                         │      │
+ *      │             └  Processor <─── ResponseQueue <─┼──────┼──┤   KafkaRequestHandler   │      │
+ *      │               └────┬────┘                     │      │  │                         │      │
+ *      │                    │                          │      │  │        ······           │      │
+ *      │                    └───────> RequestChannel ──┼──────┼─>│                         │      │
+ *      └───────────────────────────────────────────────┘      │  └─────────────────────────┘      │
+ *                                                             └───────────────────────────────────┘
+ *
+ *   其中, Acceptor和Processor均为线程, 均继承于AbstractServerThread. Acceptor负责处理Channel上的ACCEPT事件, 并将
+ *   Channel分配到Processor. Processor负责读取请求和写入响应. KafkaRequestHandlerPool中的线程负责处理Processor读取完
+ *   并存放于RequestChannel中的请求, 并将响应写入到对应ResponseQueue.
+ *
  */
 class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time, val credentialProvider: CredentialProvider) extends Logging with KafkaMetricsGroup {
 
