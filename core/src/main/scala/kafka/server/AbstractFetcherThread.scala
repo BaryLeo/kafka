@@ -56,6 +56,9 @@ abstract class AbstractFetcherThread(name: String,
   type REQ <: FetchRequest
   type PD <: PartitionData
 
+  /**
+   * 记录了所负责的各Partition的同步状态(TopicPartition->PartitionFetchState的映射)
+   */
   private[server] val partitionStates = new PartitionStates[PartitionFetchState]
   private val partitionMapLock = new ReentrantLock
   private val partitionMapCond = partitionMapLock.newCondition()
@@ -101,8 +104,11 @@ abstract class AbstractFetcherThread(name: String,
 
   override def doWork() {
     maybeTruncate()
+    // 加锁, 同步操作
     val fetchRequest = inLock(partitionMapLock) {
+      // 尝试构建FetchRequest
       val ResultWithPartitions(fetchRequest, partitionsWithError) = buildFetchRequest(states)
+      // 若没有需要同步的分区, 则等待fetchBackOffMs毫秒
       if (fetchRequest.isEmpty) {
         trace(s"There are no active partitions. Back off for $fetchBackOffMs ms before sending a fetch request")
         partitionMapCond.await(fetchBackOffMs, TimeUnit.MILLISECONDS)
@@ -110,6 +116,7 @@ abstract class AbstractFetcherThread(name: String,
       handlePartitionsWithErrors(partitionsWithError)
       fetchRequest
     }
+    // 若有分区需要同步, 则执行FetchRequest
     if (!fetchRequest.isEmpty)
       processFetchRequest(fetchRequest)
   }
@@ -153,6 +160,7 @@ abstract class AbstractFetcherThread(name: String,
 
     try {
       trace(s"Sending fetch request $fetchRequest")
+      // 发送FetchRequest,并等待Response
       responseData = fetch(fetchRequest)
     } catch {
       case t: Throwable =>

@@ -406,36 +406,57 @@ sealed trait ReplicaState {
   def validPreviousStates: Set[ReplicaState]
 }
 
+/**
+ * 新建副本
+ */
 case object NewReplica extends ReplicaState {
   val state: Byte = 1
   val validPreviousStates: Set[ReplicaState] = Set(NonExistentReplica)
 }
 
+/**
+ * 正常工作的副本
+ */
 case object OnlineReplica extends ReplicaState {
   val state: Byte = 2
   val validPreviousStates: Set[ReplicaState] = Set(NewReplica, OnlineReplica, OfflineReplica, ReplicaDeletionIneligible)
 }
 
+/**
+ * 副本所在Broker下线
+ */
 case object OfflineReplica extends ReplicaState {
   val state: Byte = 3
   val validPreviousStates: Set[ReplicaState] = Set(NewReplica, OnlineReplica, OfflineReplica, ReplicaDeletionIneligible)
 }
 
+/**
+ * 该副本已开启删除过程
+ */
 case object ReplicaDeletionStarted extends ReplicaState {
   val state: Byte = 4
   val validPreviousStates: Set[ReplicaState] = Set(OfflineReplica)
 }
 
+/**
+ * 该副本被成功删除
+ */
 case object ReplicaDeletionSuccessful extends ReplicaState {
   val state: Byte = 5
   val validPreviousStates: Set[ReplicaState] = Set(ReplicaDeletionStarted)
 }
 
+/**
+ * 副本删除失败
+ */
 case object ReplicaDeletionIneligible extends ReplicaState {
   val state: Byte = 6
   val validPreviousStates: Set[ReplicaState] = Set(ReplicaDeletionStarted)
 }
 
+/**
+ * 副本被成功删除后最终会转换为该状态
+ */
 case object NonExistentReplica extends ReplicaState {
   val state: Byte = 7
   val validPreviousStates: Set[ReplicaState] = Set(ReplicaDeletionSuccessful)

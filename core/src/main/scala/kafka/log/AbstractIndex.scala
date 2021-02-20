@@ -34,6 +34,8 @@ import scala.math.ceil
 /**
  * The abstract index class which holds entry format agnostic methods.
  *
+ * 该类的子类所对应的文件都会mmap到内存.
+ *
  * @param file The index file
  * @param baseOffset the base offset of the segment that this index is corresponding to.
  * @param maxIndexSize The maximum index size in bytes.

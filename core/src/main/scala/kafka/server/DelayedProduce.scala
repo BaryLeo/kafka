@@ -24,9 +24,9 @@ import java.util.concurrent.locks.Lock
 import com.yammer.metrics.core.Meter
 import kafka.metrics.KafkaMetricsGroup
 import kafka.utils.Pool
-
 import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.metrics.stats.Meter
 import org.apache.kafka.common.requests.ProduceResponse.PartitionResponse
 
 import scala.collection._
@@ -50,6 +50,8 @@ case class ProduceMetadata(produceRequiredAcks: Short,
 /**
  * A delayed produce operation that can be created by the replica manager and watched
  * in the produce operation purgatory
+ *
+ * @param produceMetadata 用于判断是否达到返回Success响应的条件
  */
 class DelayedProduce(delayMs: Long,
                      produceMetadata: ProduceMetadata,
@@ -126,6 +128,7 @@ class DelayedProduce(delayMs: Long,
    */
   override def onComplete() {
     val responseStatus = produceMetadata.produceStatus.mapValues(status => status.responseStatus)
+    // 构造ProducerResponse, 并将其加入RequestChannels以传递到网络层的Processor线程
     responseCallback(responseStatus)
   }
 }

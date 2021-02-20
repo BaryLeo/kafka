@@ -49,13 +49,19 @@ import java.util.regex.Pattern;
  *
  * Note that pause state as well as fetch/consumed positions are not preserved when partition
  * assignment is changed whether directly by the user or through a group rebalance.
+ *
+ *
+ * 订阅配置及消费进展
  */
 public class SubscriptionState {
     private static final String SUBSCRIPTION_EXCEPTION_MESSAGE =
             "Subscription to topics, partitions and pattern are mutually exclusive";
 
     private enum SubscriptionType {
-        NONE, AUTO_TOPICS, AUTO_PATTERN, USER_ASSIGNED
+        NONE,
+        AUTO_TOPICS,//按照名称来订阅topic
+        AUTO_PATTERN, //按照正则表达式来订阅topic
+        USER_ASSIGNED//用户强制指定消费哪个Topic的哪个Partition
     }
 
     /* the type of subscription */
@@ -455,12 +461,17 @@ public class SubscriptionState {
     }
 
     private static class TopicPartitionState {
-        private Long position; // last consumed position
+        private Long position; // last consumed position (也是下次拉取时需要指定的offset)
         private Long highWatermark; // the high watermark from last fetch
         private Long logStartOffset; // the log start offset
         private Long lastStableOffset;
         private boolean paused;  // whether this partition has been paused by the user
-        private OffsetResetStrategy resetStrategy;  // the strategy to use if the offset needs resetting
+        /**
+         * the strategy to use if the offset needs resetting.
+         *
+         * LATEST, EARLIEST, NONE
+         */
+        private OffsetResetStrategy resetStrategy;
         private Long nextAllowedRetryTimeMs;
 
         TopicPartitionState() {

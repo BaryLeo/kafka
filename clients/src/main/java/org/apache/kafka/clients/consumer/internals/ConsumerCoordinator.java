@@ -67,14 +67,35 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class ConsumerCoordinator extends AbstractCoordinator {
     private final Logger log;
+    /**
+     * 自身所支持的Partition分配策略
+     */
     private final List<PartitionAssignor> assignors;
+    /**
+     * 集群元数据
+     */
     private final Metadata metadata;
     private final ConsumerCoordinatorMetrics sensors;
+    /**
+     * 订阅状态
+     */
     private final SubscriptionState subscriptions;
     private final OffsetCommitCallback defaultOffsetCommitCallback;
+    /**
+     * 是否开启offset自动提交
+     */
     private final boolean autoCommitEnabled;
+    /**
+     * offset自动提交的间隔
+     */
     private final int autoCommitIntervalMs;
+    /**
+     * 拉取后消费前的拦截处理
+     */
     private final ConsumerInterceptors<?, ?> interceptors;
+    /**
+     * 是否排除内部Topic
+     */
     private final boolean excludeInternalTopics;
     private final AtomicInteger pendingAsyncCommits;
 
@@ -84,7 +105,13 @@ public final class ConsumerCoordinator extends AbstractCoordinator {
 
     private boolean isLeader = false;
     private Set<String> joinedSubscription;
+    /**
+     * 存储集群元数据的快照,主要用于检测Topic的Partition数量是否发生了变化
+     */
     private MetadataSnapshot metadataSnapshot;
+    /**
+     * 分区分配信息快照,主要用于检测在分区分配过程中分区熟练是否发生了变化
+     */
     private MetadataSnapshot assignmentSnapshot;
     private long nextAutoCommitDeadline;
 

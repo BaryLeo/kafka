@@ -24,6 +24,12 @@ import org.apache.kafka.common.utils.Time
 
 import scala.math._
 
+/**
+ * TimerTaskList整体有一个"到期时间",
+ * 其内存储的TimerTaskEntry也有各自的"到期时间".
+ *
+ * @param taskCounter 任务总数计数器. 该对象由各级时间轮所共享
+ */
 @threadsafe
 private[timer] class TimerTaskList(taskCounter: AtomicInteger) extends Delayed {
 
@@ -34,6 +40,10 @@ private[timer] class TimerTaskList(taskCounter: AtomicInteger) extends Delayed {
   root.next = root
   root.prev = root
 
+  /**
+   * 当前TimerTaskList到期的时间戳,
+   * 该时间戳小于等于其内任何TimerTaskEntry的过期时间
+   */
   private[this] val expiration = new AtomicLong(-1L)
 
   // Set the bucket's expiration time
@@ -132,6 +142,11 @@ private[timer] class TimerTaskList(taskCounter: AtomicInteger) extends Delayed {
 
 }
 
+/**
+ * 表示单一任务
+ * @param timerTask 具体任务, TimerTask类型, Runnable子类
+ * @param expirationMs 该任务到期时间戳
+ */
 private[timer] class TimerTaskEntry(val timerTask: TimerTask, val expirationMs: Long) extends Ordered[TimerTaskEntry] {
 
   @volatile

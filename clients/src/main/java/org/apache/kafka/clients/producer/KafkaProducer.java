@@ -239,21 +239,55 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     private final String clientId;
     // Visible for testing
     final Metrics metrics;
+    /**
+     * 分区选择器
+     */
     private final Partitioner partitioner;
+    /**
+     * 消息最大长度(包含消息头等元数据部分)
+     */
     private final int maxRequestSize;
     private final long totalMemorySize;
+    /**
+     * Kafka集群元数据
+     */
     private final Metadata metadata;
+    /**
+     * 消息收集器,按Partition对消息进行分类缓存.
+     * 是主线程和Sender线程间的数据交换介质
+     */
     private final RecordAccumulator accumulator;
+    /**
+     * 发送者线程执行的任务
+     */
     private final Sender sender;
+    /**
+     * 发送者线程
+     */
     private final Thread ioThread;
+    /**
+     * 数据压缩算法
+     */
     private final CompressionType compressionType;
     private final Sensor errors;
     private final Time time;
     private final ExtendedSerializer<K> keySerializer;
     private final ExtendedSerializer<V> valueSerializer;
+    /**
+     * Producer配置
+     */
     private final ProducerConfig producerConfig;
+    /**
+     * 等待Kafka集群元数据更新的最长时间
+     */
     private final long maxBlockTimeMs;
+    /**
+     * 等待ACK的最长时间
+     */
     private final int requestTimeoutMs;
+    /**
+     * 消息拦截器, 在发送前&ACK后做拦截操作
+     */
     private final ProducerInterceptors<K, V> interceptors;
     private final ApiVersions apiVersions;
     private final TransactionManager transactionManager;
@@ -864,6 +898,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 
             RecordAccumulator.RecordAppendResult result = accumulator.append(tp, timestamp, serializedKey,
                     serializedValue, headers, interceptCallback, remainingWaitMs);
+            // 当前消息追加RecordAccumulator里面后,所在批次已满或溢出,唤醒send线程来消费数据
             if (result.batchIsFull || result.newBatchCreated) {
                 log.trace("Waking up the sender since topic {} partition {} is either full or getting a new batch", record.topic(), partition);
                 this.sender.wakeup();

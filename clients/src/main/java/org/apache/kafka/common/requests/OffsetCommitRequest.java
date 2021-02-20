@@ -129,6 +129,9 @@ public class OffsetCommitRequest extends AbstractRequest {
     private final String groupId;
     private final String memberId;
     private final int generationId;
+    /**
+     * 该offset信息的最长保留时间
+     */
     private final long retentionTime;
     private final Map<TopicPartition, PartitionData> offsetData;
 
@@ -137,6 +140,9 @@ public class OffsetCommitRequest extends AbstractRequest {
         public final long timestamp;                // for V1
 
         public final long offset;
+        /**
+         * 可随该offset保存用户自定义数据
+         */
         public final String metadata;
 
         @Deprecated

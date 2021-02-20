@@ -57,9 +57,9 @@ class PartitionStateMachine(config: KafkaConfig,
    */
   def startup() {
     info("Initializing partition state")
-    initializePartitionState()
+    initializePartitionState()// 为所有Partition的State赋初值
     info("Triggering online partition state changes")
-    triggerOnlinePartitionStateChange()
+    triggerOnlinePartitionStateChange() // 尝试将NewPartition和OfflinePartition状态的分区转换为OnlinePartition
     info(s"Started partition state machine with initial state -> $partitionState")
   }
 
@@ -472,21 +472,33 @@ sealed trait PartitionState {
   def validPreviousStates: Set[PartitionState]
 }
 
+/**
+ * 分区刚刚被建立,还未制定Leader副本和ISR
+ */
 case object NewPartition extends PartitionState {
   val state: Byte = 0
   val validPreviousStates: Set[PartitionState] = Set(NonExistentPartition)
 }
 
+/**
+ * 已选出Leader副本,可正常对外提供服务
+ */
 case object OnlinePartition extends PartitionState {
   val state: Byte = 1
   val validPreviousStates: Set[PartitionState] = Set(NewPartition, OnlinePartition, OfflinePartition)
 }
 
+/**
+ * Leader副本宕机
+ */
 case object OfflinePartition extends PartitionState {
   val state: Byte = 2
   val validPreviousStates: Set[PartitionState] = Set(NewPartition, OnlinePartition, OfflinePartition)
 }
 
+/**
+ * 不存在(已被删除 or 压根就没存在过)
+ */
 case object NonExistentPartition extends PartitionState {
   val state: Byte = 3
   val validPreviousStates: Set[PartitionState] = Set(OfflinePartition)

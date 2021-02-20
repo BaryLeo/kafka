@@ -6,14 +6,14 @@
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-*/
+ */
 
 package kafka.cluster
 
@@ -27,6 +27,14 @@ import org.apache.kafka.common.record.RecordVersion
 import org.apache.kafka.common.requests.EpochEndOffset
 import org.apache.kafka.common.utils.Time
 
+/**
+ * 副本
+ * @param brokerId 该副本所在BrokerId
+ * @param topicPartition 记录该副本属于哪个Topic下的哪个Partition
+ * @param time
+ * @param initialHighWatermarkValue
+ * @param log 数据对象; 只有本地副本才会定义该该属性
+ */
 class Replica(val brokerId: Int,
               val topicPartition: TopicPartition,
               time: Time = Time.SYSTEM,
@@ -53,6 +61,9 @@ class Replica(val brokerId: Int,
   // the LEO of leader at time t. This is used to determine the lag of this follower and ISR of this partition.
   @volatile private[this] var _lastCaughtUpTimeMs = 0L
 
+  /**
+   * 根据数据对象(Log)的状态判断是否为本地分区
+   */
   def isLocal: Boolean = log.isDefined
 
   def lastCaughtUpTimeMs = _lastCaughtUpTimeMs
@@ -139,7 +150,7 @@ class Replica(val brokerId: Int,
   private def logStartOffset_=(newLogStartOffset: Long) {
     if (isLocal) {
       throw new KafkaException(s"Should not set log start offset on partition $topicPartition's local replica $brokerId " +
-                               s"without attempting to delete records of the log")
+        s"without attempting to delete records of the log")
     } else {
       _logStartOffset = newLogStartOffset
       trace(s"Setting log start offset for remote replica $brokerId for partition $topicPartition to [$newLogStartOffset]")

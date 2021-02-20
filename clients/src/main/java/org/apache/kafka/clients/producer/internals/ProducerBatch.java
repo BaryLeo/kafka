@@ -63,17 +63,32 @@ public final class ProducerBatch {
     final ProduceRequestResult produceFuture;
 
     private final List<Thunk> thunks = new ArrayList<>();
+    /**
+     * 消息数据实际维护者.
+     *
+     * append来的消息数据会被写入MemoryRecordsBuilder.appendStream.
+     * 当调用MemoryRecordsBuilder.build()时,会在appendStream基础上构建MemoryRecords并返回.
+     */
     private final MemoryRecordsBuilder recordsBuilder;
+    /**
+     * 尝试发送当前ProducerBatch的次数
+     */
     private final AtomicInteger attempts = new AtomicInteger(0);
     private final boolean isSplitBatch;
     private final AtomicReference<FinalState> finalState = new AtomicReference<>(null);
 
+    /**
+     * 本批消息的消息数量
+     */
     int recordCount;
     int maxRecordSize;
     private long lastAttemptMs;
     private long lastAppendTime;
     private long drainedMs;
     private String expiryErrorMessage;
+    /**
+     * 是否处于重试过程中
+     */
     private boolean retry;
     private boolean reopened = false;
 

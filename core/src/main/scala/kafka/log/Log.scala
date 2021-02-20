@@ -135,6 +135,9 @@ case class CompletedTxn(producerId: Long, firstOffset: Long, lastOffset: Long, i
  * New log segments are created according to a configurable policy that controls the size in bytes or time interval
  * for a given segment.
  *
+ * Log代表一个"逻辑层面"的日志(也即一个Partition), 由多个日志段(LogSegment)组成.
+ * Log使用跳表来管理多个LogSegment(见segments字段, ConcurrentSkipListMap类型; 其中key为offset, value为LogSegment).
+ *
  * @param dir The directory in which log segments are created.
  * @param config The log configuration settings
  * @param logStartOffset The earliest offset allowed to be exposed to kafka client.
@@ -801,14 +804,14 @@ class Log(@volatile var dir: File,
     maybeHandleIOException(s"Error while appending records to $topicPartition in dir ${dir.getParent}") {
       val appendInfo = analyzeAndValidateRecords(records, isFromClient = isFromClient)
 
-      // return if we have no valid messages or if this is a duplicate of the last appended entry
+      // 1. return if we have no valid messages or if this is a duplicate of the last appended entry
       if (appendInfo.shallowCount == 0)
         return appendInfo
 
-      // trim any invalid bytes or partial messages before appending it to the on-disk log
+      // 2. trim any invalid bytes or partial messages before appending it to the on-disk log
       var validRecords = trimInvalidBytes(records, appendInfo)
 
-      // they are valid, insert them in the log
+      // 3. they are valid, insert them in the log
       lock synchronized {
         checkIfMemoryMappedBufferClosed()
         if (assignOffsets) {
@@ -950,6 +953,7 @@ class Log(@volatile var dir: File,
           s"next offset: ${nextOffsetMetadata.messageOffset}, " +
           s"and messages: $validRecords")
 
+        // 若新增消息条数大于等于config.flushInterval, 则执行文件刷盘
         if (unflushedMessages >= config.flushInterval)
           flush()
 
@@ -1606,6 +1610,7 @@ class Log(@volatile var dir: File,
         return
       debug(s"Flushing log up to offset $offset, last flushed: $lastFlushTime,  current time: ${time.milliseconds()}, " +
         s"unflushed: $unflushedMessages")
+      // 将涉及offset大于给定offset消息的LogSegment都拉出来执行flush
       for (segment <- logSegments(this.recoveryPoint, offset))
         segment.flush()
 

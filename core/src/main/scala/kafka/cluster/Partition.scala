@@ -52,20 +52,38 @@ class Partition(val topic: String,
 
   val topicPartition = new TopicPartition(topic, partitionId)
 
-  // Do not use replicaManager if this partition is ReplicaManager.OfflinePartition
+  /**
+   * Do not use replicaManager if this partition is ReplicaManager.OfflinePartition
+   *
+   * 当前BrokerId
+   */
   private val localBrokerId = if (!isOffline) replicaManager.config.brokerId else -1
   private val logManager = if (!isOffline) replicaManager.logManager else null
   private val zkClient = if (!isOffline) replicaManager.zkClient else null
-  // allReplicasMap includes both assigned replicas and the future replica if there is ongoing replica movement
+  /**
+   * allReplicasMap includes both assigned replicas and the future replica
+   * if there is ongoing replica movement.
+   *
+   * 所有副本集合
+   */
   private val allReplicasMap = new Pool[Int, Replica]
   // The read lock is only required when multiple reads are executed and needs to be in a consistent manner
   private val leaderIsrUpdateLock = new ReentrantReadWriteLock
   private var zkVersion: Int = LeaderAndIsr.initialZKVersion
+  /**
+   * Leader副本年代信息
+   */
   @volatile private var leaderEpoch: Int = LeaderAndIsr.initialLeaderEpoch - 1
   // start offset for 'leaderEpoch' above (leader epoch of the current leader for this partition),
   // defined when this broker is leader for partition
   @volatile private var leaderEpochStartOffsetOpt: Option[Long] = None
+  /**
+   * 该分区的Leader副本Id
+   */
   @volatile var leaderReplicaIdOpt: Option[Int] = None
+  /**
+   * ISR副本集合
+   */
   @volatile var inSyncReplicas: Set[Replica] = Set.empty[Replica]
 
   /* Epoch of the controller that last changed the leader. This needs to be initialized correctly upon broker startup.
@@ -423,13 +441,16 @@ class Partition(val topic: String,
       // check if this replica needs to be added to the ISR
       leaderReplicaIfLocal match {
         case Some(leaderReplica) =>
+          // 获取Leader副本
           val replica = getReplica(replicaId).get
+          // 获取Leader副本的HW
           val leaderHW = leaderReplica.highWatermark
           val fetchOffset = logReadResult.info.fetchOffsetMetadata.messageOffset
-          if (!inSyncReplicas.contains(replica) &&
-             assignedReplicas.map(_.brokerId).contains(replicaId) &&
-             replica.logEndOffset.offsetDiff(leaderHW) >= 0 &&
-             leaderEpochStartOffsetOpt.exists(fetchOffset >= _)) {
+          // 将满足条件的副本添加至ISR
+          if (!inSyncReplicas.contains(replica) && // a. 给定副本当前不在ISR内
+             assignedReplicas.map(_.brokerId).contains(replicaId) && // b. 给定副本在AR内
+             replica.logEndOffset.offsetDiff(leaderHW) >= 0 && // c. 给定副本LEO大于等于Leader副本HW
+             leaderEpochStartOffsetOpt.exists(fetchOffset >= _)) { //
             val newInSyncReplicas = inSyncReplicas + replica
             info(s"Expanding ISR from ${inSyncReplicas.map(_.brokerId).mkString(",")} " +
               s"to ${newInSyncReplicas.map(_.brokerId).mkString(",")}")
@@ -445,13 +466,15 @@ class Partition(val topic: String,
     }
   }
 
-  /*
+  /**
    * Returns a tuple where the first element is a boolean indicating whether enough replicas reached `requiredOffset`
    * and the second element is an error (which would be `Errors.NONE` for no error).
    *
    * Note that this method will only be called if requiredAcks = -1 and we are waiting for all replicas in ISR to be
    * fully caught up to the (local) leader's offset corresponding to this produce request before we acknowledge the
    * produce request.
+   *
+   * 注意, 该方法检测的是给定Offset是否被ISR内所有副本同步, 只适合requiredAcks = -1的情况.
    */
   def checkEnoughReplicasReachOffset(requiredOffset: Long): (Boolean, Errors) = {
     leaderReplicaIfLocal match {
@@ -504,9 +527,11 @@ class Partition(val topic: String,
    * since all callers of this private API acquire that lock
    */
   private def maybeIncrementLeaderHW(leaderReplica: Replica, curTime: Long = time.milliseconds): Boolean = {
+    // 获取ISR中所有有效副本的LEO
     val allLogEndOffsets = assignedReplicas.filter { replica =>
       curTime - replica.lastCaughtUpTimeMs <= replicaManager.config.replicaLagTimeMaxMs || inSyncReplicas.contains(replica)
     }.map(_.logEndOffset)
+    // 以ISR副本LEO中的最小值作为HW
     val newHighWatermark = allLogEndOffsets.min(new LogOffsetMetadata.OffsetOrdering)
     val oldHighWatermark = leaderReplica.highWatermark
 
@@ -549,6 +574,12 @@ class Partition(val topic: String,
     replicaManager.tryCompleteDelayedDeleteRecords(requestKey)
   }
 
+  /**
+   * 尝试缩减ISR;
+   * 若ISR发生了变化, 则将新ISR数据存入ZK
+   *
+   * @param replicaMaxLagTimeMs 判断标准(副本超过该时间仍未追上Leader副本LEO, 则要将其移出ISR)
+   */
   def maybeShrinkIsr(replicaMaxLagTimeMs: Long) {
     val leaderHWIncremented = inWriteLock(leaderIsrUpdateLock) {
       leaderReplicaIfLocal match {

@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.clients.consumer.internals;
 
+import kafka.common.UnsentRequests;
+
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
 import org.apache.kafka.clients.KafkaClient;
@@ -49,6 +51,17 @@ import java.util.concurrent.locks.ReentrantLock;
  * Higher level consumer access to the network layer with basic support for request futures. This class
  * is thread-safe, but provides no synchronization for response callbacks. This guarantees that no locks
  * are held when they are invoked.
+ *
+ * 该通信基础类的两类重要方法是send和poll.
+ * 其中, send是将request缓冲入队列(unsent), 并未执行网络IO;
+ * poll是取队列中的请求执行对应网络IO.
+ * ConsumerNetworkClient底层依赖NetworkClient(KafkaClient子类),
+ * ConsumerNetworkClient.send对应NetworkClient.send,
+ * ConsumerNetworkClient.poll对应NetworkClient.poll,
+ * 概念上是一致的, 只不过NetworkClient内请求缓存队列叫inFlightRequests.
+ *
+ * ConsumerNetworkClient和NetworkClient还有一个wakeup方法.
+ * 其实该方法可以按"interrupt"去理解,即中断阻塞中的Selector.select
  */
 public class ConsumerNetworkClient implements Closeable {
     private static final int MAX_POLL_TIMEOUT_MS = 5000;
@@ -56,8 +69,17 @@ public class ConsumerNetworkClient implements Closeable {
     // the mutable state of this class is protected by the object's monitor (excluding the wakeup
     // flag and the request completion queue below).
     private final Logger log;
+    /**
+     * 底层通信客户端
+     */
     private final KafkaClient client;
+    /**
+     * 还未发送的请求的缓冲队列
+     */
     private final UnsentRequests unsent = new UnsentRequests();
+    /**
+     * Kafka集群元数据
+     */
     private final Metadata metadata;
     private final Time time;
     private final long retryBackoffMs;
@@ -257,7 +279,12 @@ public class ConsumerNetworkClient implements Closeable {
             // Handle async disconnects prior to attempting any sends
             handlePendingDisconnects();
 
-            // send all the requests we can send now
+            /*
+             * send all the requests we can send now
+             * --------------------------------------
+             * 这里其实是将所有unsent内的request通过NetworkClient.send方法
+             * 存入NetworkClient.inFlightRequests队列, 并未实际执行网络IO
+             */
             long pollDelayMs = trySend(now);
             timeout = Math.min(timeout, pollDelayMs);
 

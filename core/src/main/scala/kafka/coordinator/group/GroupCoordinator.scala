@@ -46,6 +46,24 @@ import scala.math.max
  * lock. ReplicaManager.appendRecords may be invoked while holding the group lock
  * used by its callback.  The delayed callback may acquire the group lock
  * since the delayed operation is completed only if the group lock can be acquired.
+ *
+ * 每个Broker都会实例化一个GroupCoordinator,负责管理所有ConsumerGroup的一个子集.
+ *
+ * 消费者与GroupCoordinator间的交互流程:
+ * 1. 向负载最小的Broker发送消息,查询自己所对应的GroupCoordinator在哪个节点上;
+ * 2. 将剩余的JoinGroupRequest或SyncGroupRequest发给查询到的节点.
+ *    备注:
+ *    a. JoinGroupRequest用于新消费者申请加入ConsumerGroup;
+ *    b. SyncGroupRequest用于LeaderConsumer将Partition分配结果同步给GroupCoordinator.
+ *
+ * 实际上,一个ConsumerGroup对应的GroupCoordinator就是该Group所对应的
+ * `__consumer_offsets`下的Partition的Leader副本所在Broker节点.
+ *
+ * @param groupConfig 指定了consumer session超时时间区间等配置
+ * @param offsetConfig 指定了offsets topic内Partition数量等配置
+ * @param groupManager "消费offset"和"ConsumerGroup元数据"维护者
+ * @param heartbeatPurgatory 心跳延时操作
+ * @param joinPurgatory JoinGroup延时操作
  */
 class GroupCoordinator(val brokerId: Int,
                        val groupConfig: GroupConfig,

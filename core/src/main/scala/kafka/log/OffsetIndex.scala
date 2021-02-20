@@ -47,6 +47,15 @@ import org.apache.kafka.common.errors.InvalidOffsetException
  *
  * All external APIs translate from relative offsets to full offsets, so users of this class do not interact with the internal
  * storage format.
+ *
+ * 首先需要提的一点是: Kafka的Offset的"逻辑值"(类似于自增主键, 1,2,3,...,n), 而非物理值(区别于RocketMQ).
+ * OffsetIndex用于加速Offset到物理地址的转换. 实际使用时, OffsetIndex会被mmap到内存,
+ * 所以设计层面要仔细规划OffsetIndex文件大小.
+ *
+ * 为了节省空间, OffsetIndex保存的是"相对offset"到物理地址的映射, 而非offset本身到物理地址的映射.
+ *
+ * @param _file      索引文件
+ * @param baseOffset 对应日志段数据文件内第一个消息的offset
  */
 // Avoid shadowing mutable `file` in AbstractIndex
 class OffsetIndex(_file: File, baseOffset: Long, maxIndexSize: Int = -1, writable: Boolean = true)
@@ -78,6 +87,8 @@ class OffsetIndex(_file: File, baseOffset: Long, maxIndexSize: Int = -1, writabl
    * Find the largest offset less than or equal to the given targetOffset
    * and return a pair holding this offset and its corresponding physical file position.
    *
+   * 二分查找.
+   *
    * @param targetOffset The offset to look up.
    * @return The offset found and the corresponding file position for this offset
    *         If the target offset is smaller than the least entry in the index (or the index is empty),
@@ -86,6 +97,7 @@ class OffsetIndex(_file: File, baseOffset: Long, maxIndexSize: Int = -1, writabl
   def lookup(targetOffset: Long): OffsetPosition = {
     maybeLock(lock) {
       val idx = mmap.duplicate
+      // 二分查找
       val slot = largestLowerBoundSlotFor(idx, targetOffset, IndexSearchType.KEY)
       if(slot == -1)
         OffsetPosition(baseOffset, 0)

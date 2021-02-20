@@ -118,11 +118,17 @@ public class Fetcher<K, V> implements SubscriptionState.Listener, Closeable {
     private final int fetchSize;
     private final long retryBackoffMs;
     private final long requestTimeoutMs;
+    /**
+     * 每次获取的最大消息数量
+     */
     private final int maxPollRecords;
     private final boolean checkCrcs;
     private final Metadata metadata;
     private final FetchManagerMetrics sensors;
     private final SubscriptionState subscriptions;
+    /**
+     * 保存成功返回的FetchRequest的结果
+     */
     private final ConcurrentLinkedQueue<CompletedFetch> completedFetches;
     private final BufferSupplier decompressionBufferSupplier = BufferSupplier.create();
     private final ExtendedDeserializer<K> keyDeserializer;
@@ -202,7 +208,9 @@ public class Fetcher<K, V> implements SubscriptionState.Listener, Closeable {
      * @return number of fetches sent
      */
     public synchronized int sendFetches() {
+        // 按节点组织Fetch请求(同一个节点负责的多个Partition会包含在同一条FetchRequest内,有效节省带宽)
         Map<Node, FetchSessionHandler.FetchRequestData> fetchRequestMap = prepareFetchRequests();
+        // 处理指向各Node的FetchRequest
         for (Map.Entry<Node, FetchSessionHandler.FetchRequestData> entry : fetchRequestMap.entrySet()) {
             final Node fetchTarget = entry.getKey();
             final FetchSessionHandler.FetchRequestData data = entry.getValue();

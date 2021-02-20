@@ -81,6 +81,31 @@ object TransactionCoordinator {
  * Each Kafka server instantiates a transaction coordinator which is responsible for a set of
  * producers. Producers with specific transactional ids are assigned to their corresponding coordinators;
  * Producers with no specific transactional id may talk to a random broker as their coordinators.
+ *
+ * Kafka的"事务"是针对"Consume-Transform-Produce"这种典型数据处理流程而设计的.
+ * TransactionCoordinator是整个事务的协调者,同时也是事务状态Topic(`__transaction_state`)下
+ * 和Producer的transactionId相对应的Partition的Leader(这点和GroupCoordinator有点像).
+ *
+ * Kafka事务流程大致如下:
+ *   #初始化阶段#
+ *   1. 根据transactionId查找对应的TransactionCoordinator;
+ *   2. 获取PID(向TransactionCoordinator发送InitProducerIdRequest);
+ *   #事务处理阶段#
+ *   3. 从数据源Topic拉取消息(对应Consume-Transform-Produce中的Consume);
+ *   4. Transform;
+ *   5. 告知TransactionCoordinator当前过程的Produce涉及哪些Partition;
+ *   6. Produce"半消息"到这些Partition;
+ *   7. 告知TransactionCoordinator消费者的GroupId和本次消费的Partition有哪些(AddOffsetsToTxnRequest);
+ *   8. 告知TransactionCoordinator以"半消息"的形式提交本次消费数据的offset
+ *      (向TransactionCoordinator发TxnOffsetCommitRequest,
+ *       TransactionCoordinator负责去和对应GroupCoordinator交互);
+ *   9. 提交或终止事务
+ *      (向TransactionCoordinator发送EndTxnRequest.
+ *       TransactionCoordinator会向本次涉及到的Produce分区Leader和GroupCoordinator发送WriteTxnMarkersRequest
+ *       写入事务控制消息, 即Commit或Abort).
+ *
+ * 可以看到Kafka的事务本质就是实现了"跨分区写入的原子性". 应用场景也可以有很多变种
+ * (如既可以保证Consume-Transform-Produce的原子性, 也可以省去Consume, 直接保证Produce多条消息的原子性).
  */
 class TransactionCoordinator(brokerId: Int,
                              txnConfig: TransactionConfig,
