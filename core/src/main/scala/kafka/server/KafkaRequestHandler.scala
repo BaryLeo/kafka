@@ -33,6 +33,8 @@ import scala.collection.mutable
  * A thread that answers kafka requests.
  *
  * 以KafkaRequestHandlerPool形式维护在`kafka.server.KafkaServer`
+ *
+ * 逻辑很简单: 将Request交给KafkaApis来handle
  */
 class KafkaRequestHandler(id: Int,
                           brokerId: Int,

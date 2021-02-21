@@ -51,6 +51,9 @@ public class RequestHeader extends AbstractRequestResponse {
             new Field(API_VERSION_FIELD_NAME, INT16, "The version of the API."),
             new Field(CORRELATION_ID_FIELD_NAME, INT32, "A user-supplied integer value that will be passed back with the response"));
 
+    /**
+     * 区分请求类型(如Produce、Fetch等等)
+     */
     private final ApiKeys apiKey;
     private final short apiVersion;
     private final String clientId;
