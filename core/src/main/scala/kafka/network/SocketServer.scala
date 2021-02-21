@@ -77,7 +77,9 @@ import scala.util.control.ControlThrowable
  *
  *   其中, Acceptor和Processor均为线程, 均继承于AbstractServerThread. Acceptor负责处理Channel上的ACCEPT事件, 并将
  *   Channel分配到Processor. Processor负责读取请求和写入响应. KafkaRequestHandlerPool中的线程负责处理Processor读取完
- *   并存放于RequestChannel中的请求, 并将响应写入到对应ResponseQueue.
+ *   并存放于RequestChannel中的请求, 并将响应写入到对应ResponseQueue.Response中的int属性processor指定了该Response插入到哪个Queue.
+ *   而Response.processor属性其实来源于Request.processor, 在接收到请求后设置的. 也就是说只有拿到了对应的Request对象才能知道Response
+ *   该发往何处.
  *
  */
 class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time, val credentialProvider: CredentialProvider) extends Logging with KafkaMetricsGroup {

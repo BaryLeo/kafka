@@ -32,7 +32,7 @@ import scala.collection.mutable
 /**
  * A thread that answers kafka requests.
  *
- * 以KafkaRequestHandlerPool形式维护在{@link kafka.server.KafkaServer}
+ * 以KafkaRequestHandlerPool形式维护在`kafka.server.KafkaServer`
  */
 class KafkaRequestHandler(id: Int,
                           brokerId: Int,
