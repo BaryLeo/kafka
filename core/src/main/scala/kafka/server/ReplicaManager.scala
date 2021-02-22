@@ -503,7 +503,7 @@ class ReplicaManager(val config: KafkaConfig,
                     requiredAcks: Short,
                     internalTopicsAllowed: Boolean,
                     isFromClient: Boolean,
-                    entriesPerPartition: Map[TopicPartition, MemoryRecords],
+                    entriesPerPartition: Map[TopicPartition, MemoryRecords],// 各Partition上待插入的消息数据
                     responseCallback: Map[TopicPartition, PartitionResponse] => Unit,
                     delayedProduceLock: Option[Lock] = None,
                     recordConversionStatsCallback: Map[TopicPartition, RecordConversionStats] => Unit = _ => ()) {
