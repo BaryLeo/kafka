@@ -678,11 +678,13 @@ class Partition(val topic: String,
   def appendRecordsToLeader(records: MemoryRecords, isFromClient: Boolean, requiredAcks: Int = 0): LogAppendInfo = {
     val (info, leaderHWIncremented) = inReadLock(leaderIsrUpdateLock) {
       leaderReplicaIfLocal match {
+        // 若本节点是目标Partition的Leader副本
         case Some(leaderReplica) =>
           val log = leaderReplica.log.get
           val minIsr = log.config.minInSyncReplicas
           val inSyncSize = inSyncReplicas.size
 
+          // acks只有3种配置值: 0/1/all(-1)
           // Avoid writing to leader if there are not enough insync replicas to make it safe
           if (inSyncSize < minIsr && requiredAcks == -1) {
             throw new NotEnoughReplicasException("Number of insync replicas for partition %s is [%d], below required minimum [%d]"
@@ -695,6 +697,7 @@ class Partition(val topic: String,
           // we may need to increment high watermark since ISR could be down to 1
           (info, maybeIncrementLeaderHW(leaderReplica))
 
+        // 若本节点不是目标Partition的Leader副本
         case None =>
           throw new NotLeaderForPartitionException("Leader not local for partition %s on broker %d"
             .format(topicPartition, localBrokerId))

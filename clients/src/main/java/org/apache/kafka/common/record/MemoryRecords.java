@@ -40,6 +40,13 @@ import java.util.Objects;
  * A {@link Records} implementation backed by a ByteBuffer. This is used only for reading or
  * modifying in-place an existing buffer of record batches. To create a new buffer see {@link MemoryRecordsBuilder},
  * or one of the {@link #builder(ByteBuffer, byte, CompressionType, TimestampType, long)} variants.
+ *
+ * 主要用于接收外部数据等内存数据传递操作。Kafka中有两类AbstractRecords对象，另一个是 {@link FileRecords}。
+ * FileRecord则是Records在文件中的表示。
+ *
+ * 值得明确的一点: Records的含义是"多个Record", 而在Kafka中, 一个"Record"其实指的是一个"Batch".
+ * 见{@link MemoryRecords#batches}属性
+ *
  */
 public class MemoryRecords extends AbstractRecords {
     private static final Logger log = LoggerFactory.getLogger(MemoryRecords.class);

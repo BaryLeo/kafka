@@ -125,7 +125,10 @@ object ReplicaManager {
 }
 
 /**
- * 维护&管理一个Broker上的所有Partition
+ * 维护&管理一个Broker上的所有Partition, 是Kafka存储层的入口.
+ * kafka存储层涉及如下几个关键类：
+ * 组件表示类：Partition->Replica->Log->LogSegment
+ * 数据表示类：MemoryRecords和FileRecords
  *
  * @param config
  * @param metrics
