@@ -45,7 +45,9 @@ import java.util.Objects;
  * FileRecord则是Records在文件中的表示。
  *
  * 值得明确的一点: Records的含义是"多个Record", 而在Kafka中, 一个"Record"其实指的是一个"Batch".
- * 见{@link MemoryRecords#batches}属性
+ * 见{@link MemoryRecords#batches}属性.
+ *
+ * MemoryRecords对象一旦被创建出来就是只读的了, 消息的append过程要参考{@link MemoryRecordsBuilder}
  *
  */
 public class MemoryRecords extends AbstractRecords {
