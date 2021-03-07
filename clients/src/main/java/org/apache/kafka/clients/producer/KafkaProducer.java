@@ -228,6 +228,28 @@ import static org.apache.kafka.common.serialization.ExtendedSerializer.Wrapper.e
  * certain client features.  For instance, the transactional APIs need broker versions 0.11.0 or later. You will receive an
  * <code>UnsupportedVersionException</code> when invoking an API that is not available in the running broker version.
  * </p>
+ *
+ * 消息发送大致流程:
+ *
+ *         主线程                 │        Sender线程
+ *                               │
+ *    KafkaProducer.send()       │
+ *            ↓                  │
+ *    ProducerInterceptors       │
+ *    (在消息发送前拦截修改)         │
+ *            ↓                  │
+ *        Serializer             │
+ *     (序列化key和value)          │
+ *            ↓                  │
+ *       Partitioner             │
+ *        (选择分区)               │
+ *            ↓                  │
+ *     RecordAccumulator         │
+ *    (append()方法收集消息)       │
+ *
+ *
+ *
+ *
  */
 public class KafkaProducer<K, V> implements Producer<K, V> {
 
