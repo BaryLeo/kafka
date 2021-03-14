@@ -236,15 +236,15 @@ import static org.apache.kafka.common.serialization.ExtendedSerializer.Wrapper.e
  *    KafkaProducer.send()       │
  *            ↓                  │
  *    ProducerInterceptors       │
- *    (在消息发送前拦截修改)         │
- *            ↓                  │
- *        Serializer             │
- *     (序列化key和value)          │
- *            ↓                  │
- *       Partitioner             │
- *        (选择分区)               │
- *            ↓                  │
- *     RecordAccumulator         │
+ *    (在消息发送前拦截修改)         │      调用Response.onComplete()
+ *            ↓                  │             ↑
+ *        Serializer             │             │
+ *     (序列化key和value)          │             │
+ *            ↓                  │            发送消息
+ *       Partitioner             │              ↑
+ *        (选择分区)              │              │
+ *            ↓                  │              │
+ *     RecordAccumulator ────────┼─────> RecordAccumulator取消息
  *    (append()方法收集消息)       │
  *
  *
@@ -257,7 +257,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     private static final AtomicInteger PRODUCER_CLIENT_ID_SEQUENCE = new AtomicInteger(1);
     private static final String JMX_PREFIX = "kafka.producer";
     public static final String NETWORK_THREAD_PREFIX = "kafka-producer-network-thread";
-
+    /**
+     * 生产者唯一标识
+     */
     private final String clientId;
     // Visible for testing
     final Metrics metrics;
@@ -269,6 +271,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      * 消息最大长度(包含消息头等元数据部分)
      */
     private final int maxRequestSize;
+    /**
+     * 发送单个消息的缓冲区大小
+     */
     private final long totalMemorySize;
     /**
      * Kafka集群元数据
@@ -877,6 +882,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // first make sure the metadata for the topic is available
             ClusterAndWaitTime clusterAndWaitTime;
             try {
+                // 获取元数据和ProduceRequest一样走Sender线程
                 clusterAndWaitTime = waitOnMetadata(record.topic(), record.partition(), maxBlockTimeMs);
             } catch (KafkaException e) {
                 if (metadata.isClosed())

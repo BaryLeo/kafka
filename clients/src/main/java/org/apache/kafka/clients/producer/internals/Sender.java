@@ -235,7 +235,9 @@ public class Sender implements Runnable {
             }
         }
 
+        // 1. 发送请求,并确定下一步的阻塞超时时间
         long pollTimeout = sendProducerData(now);
+        // 2. 处理端口事件,poll的timeout为上一步计算结果
         client.poll(pollTimeout, now);
     }
 
