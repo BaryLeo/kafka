@@ -59,7 +59,13 @@ public final class ProducerBatch {
     private enum FinalState { ABORTED, FAILED, SUCCEEDED }
 
     final long createdMs;
+    /**
+     * 目标Partition
+     */
     final TopicPartition topicPartition;
+    /**
+     * 表示当前ProduceBatch的produce状态
+     */
     final ProduceRequestResult produceFuture;
 
     private final List<Thunk> thunks = new ArrayList<>();
@@ -81,8 +87,14 @@ public final class ProducerBatch {
      * 本批消息的消息数量
      */
     int recordCount;
+    /**
+     * 最大Record字节数
+     */
     int maxRecordSize;
     private long lastAttemptMs;
+    /**
+     * 上一次追加消息时的时间戳
+     */
     private long lastAppendTime;
     private long drainedMs;
     private String expiryErrorMessage;

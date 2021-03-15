@@ -50,6 +50,9 @@ public class MemoryRecordsBuilder {
     });
 
     private final TimestampType timestampType;
+    /**
+     * 压缩算法
+     */
     private final CompressionType compressionType;
     // Used to hold a reference to the underlying ByteBuffer so that we can write the record batch header and access
     // the written bytes. ByteBufferOutputStream allocates a new ByteBuffer if the existing one is not large enough,

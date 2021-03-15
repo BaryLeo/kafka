@@ -132,11 +132,15 @@ public enum CompressionType {
      * Currently, {@link MemoryRecordsBuilder#writeDefaultBatchHeader()} and {@link MemoryRecordsBuilder#writeLegacyCompressedWrapperHeader()}
      * write to the underlying buffer in the given {@link ByteBufferOutputStream} after the compressed data has been written.
      * In the event that the buffer needs to be expanded while writing the data, access to the underlying buffer needs to be preserved.
+     *
+     * 输入一个Stream, 输出对应的"压缩"版Stream
      */
     public abstract OutputStream wrapForOutput(ByteBufferOutputStream bufferStream, byte messageVersion);
 
     /**
      * Wrap buffer with an InputStream that will decompress data with this CompressionType.
+     *
+     * 输入一个Stream, 输出对应的"解压"版Stream
      *
      * @param decompressionBufferSupplier The supplier of ByteBuffer(s) used for decompression if supported.
      *                                    For small record batches, allocating a potentially large buffer (64 KB for LZ4)
