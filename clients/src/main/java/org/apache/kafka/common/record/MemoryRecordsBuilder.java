@@ -72,6 +72,11 @@ public class MemoryRecordsBuilder {
     private float estimatedCompressionRatio = 1.0F;
 
     // Used to append records, may compress data on the fly
+    /**
+     * Used to append records, may compress data on the fly.
+     * 输出流. 对其进行write操作时, 输入的数据会被按批次压缩.
+     * 详情见本类构造方法对appendStream的赋值.
+     */
     private DataOutputStream appendStream;
     private boolean isTransactional;
     private long producerId;
@@ -131,6 +136,8 @@ public class MemoryRecordsBuilder {
 
         bufferStream.position(initialPosition + batchHeaderSizeInBytes);
         this.bufferStream = bufferStream;
+        // DataOutputStream仅仅是将基础数据类型映射到bytes, 无其他IO相关的额外逻辑(如buffer等)
+        // 压缩批次为8KB
         this.appendStream = new DataOutputStream(compressionType.wrapForOutput(this.bufferStream, magic));
     }
 

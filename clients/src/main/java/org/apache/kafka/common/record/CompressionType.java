@@ -54,6 +54,9 @@ public enum CompressionType {
                 // Set input buffer (uncompressed) to 16 KB (none by default) and output buffer (compressed) to
                 // 8 KB (0.5 KB by default) to ensure reasonable performance in cases where the caller passes a small
                 // number of bytes to write (potentially a single byte)
+                // BufferedOutputStream将数据写入到underlying stream的情况只有两种:
+                // 1. write入的数据超过了buffer的size;
+                // 2. 被强制调用了flush()
                 return new BufferedOutputStream(new GZIPOutputStream(buffer, 8 * 1024), 16 * 1024);
             } catch (Exception e) {
                 throw new KafkaException(e);

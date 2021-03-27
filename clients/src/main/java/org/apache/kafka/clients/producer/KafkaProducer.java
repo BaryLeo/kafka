@@ -240,12 +240,14 @@ import static org.apache.kafka.common.serialization.ExtendedSerializer.Wrapper.e
  *            ↓                  │             ↑
  *        Serializer             │             │
  *     (序列化key和value)          │             │
- *            ↓                  │            发送消息
+ *            ↓                  │            发送消息(最小单位是ProduceBatch, 不可再拆分)
  *       Partitioner             │              ↑
  *        (选择分区)              │              │
  *            ↓                  │              │
  *     RecordAccumulator ────────┼─────> RecordAccumulator取消息
  *    (append()方法收集消息)       │
+ *    (同Partition下的数据会以
+ *     8KB为批次进行压缩)
  *
  *
  *
