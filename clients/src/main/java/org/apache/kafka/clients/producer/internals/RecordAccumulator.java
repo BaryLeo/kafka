@@ -72,7 +72,13 @@ public final class RecordAccumulator {
     private volatile boolean closed;
     private final AtomicInteger flushesInProgress;
     private final AtomicInteger appendsInProgress;
+    /**
+     * 指定ProducerBatch中ByteBuffer大小
+     */
     private final int batchSize;
+    /**
+     * 压缩类型
+     */
     private final CompressionType compression;
     private final long lingerMs;
     private final long retryBackoffMs;
@@ -80,7 +86,8 @@ public final class RecordAccumulator {
     private final Time time;
     private final ApiVersions apiVersions;
     /**
-     * 按Partition组织的消息批队列
+     * 按Partition组织的消息批队列.
+     * 一个 ProducerBatch 对应一个 MemoryRecords, 也即对应一个 MemoryRecordsBuilder.
      */
     private final ConcurrentMap<TopicPartition, Deque<ProducerBatch>> batches;
     /**
@@ -436,10 +443,12 @@ public final class RecordAccumulator {
      */
     public ReadyCheckResult ready(Cluster cluster, long nowMs) {
         Set<Node> readyNodes = new HashSet<>();
+        // 多少毫秒后进行下一次read检查
         long nextReadyCheckDelayMs = Long.MAX_VALUE;
         Set<String> unknownLeaderTopics = new HashSet<>();
 
         boolean exhausted = this.free.queued() > 0;
+        // 遍历检查所有TopicPartition下代发送的ProduceBatch列表
         for (Map.Entry<TopicPartition, Deque<ProducerBatch>> entry : this.batches.entrySet()) {
             TopicPartition part = entry.getKey();
             Deque<ProducerBatch> deque = entry.getValue();
@@ -458,6 +467,14 @@ public final class RecordAccumulator {
                         long timeToWaitMs = backingOff ? retryBackoffMs : lingerMs;
                         boolean full = deque.size() > 1 || batch.isFull();
                         boolean expired = waitedTimeMs >= timeToWaitMs;
+                        /*
+                         * ready条件:
+                         * 1. 队列中有一个或多个ProduceBatch满了;
+                         * 2. 是否超过了最大等待时间;
+                         * 3. BufferPool是否已耗尽(意味着无法再分配新的ProduceBatch);
+                         * 4. 处于关闭流程中;
+                         * 5. 有线程在等待flush操作完成;
+                         */
                         boolean sendable = full || expired || exhausted || closed || flushInProgress();
                         if (sendable && !backingOff) {
                             readyNodes.add(leader);
