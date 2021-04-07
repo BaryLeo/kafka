@@ -44,6 +44,10 @@ import scala.collection.mutable.ListBuffer
  * A subclass of DelayedOperation needs to provide an implementation of both onComplete() and tryComplete().
  *
  * DelayOperation是指"最多延迟给定时间,但必然被执行的操作", 并没有"成功"与"失败"的概念.
+ * DelayOperation有两种触发方式:
+ *   1. 超时;
+ *   2. 等待的事件发生;
+ * 可以直观的看出, DelayOperation就是在TimerTask的基础上添加了"事件触发"的能力.
  *
  * 重要子类有:
  * 1. DelayedProduce: 延迟一定时间后判断给Producer返回Success响应 or ERROR响应;
@@ -53,7 +57,9 @@ import scala.collection.mutable.ListBuffer
  */
 abstract class DelayedOperation(override val delayMs: Long,
     lockOpt: Option[Lock] = None) extends TimerTask with Logging {
-
+  /**
+   * 任务是否已完成
+   */
   private val completed = new AtomicBoolean(false)
   private val tryCompletePending = new AtomicBoolean(false)
   // Visible for testing

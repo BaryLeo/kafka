@@ -55,7 +55,9 @@ trait Timer {
  * "定时器".
  * 其本质就是时间轮数据结构的一个门面封装, 自身并不具备推动时间的能力.
  *
- * 至于"时间推动", 可参考DelayedOperationPurgatory.ExpiredOperationReaper
+ * 至于"时间推动", 其能力来源是delayQueue属性.
+ * DelayedOperationPurgatory.ExpiredOperationReaper相关过程会尝试从delayQueue中取TimerTaskList,
+ * 若无TimerTaskList到期则会阻塞.
  *
  * @param executorName 用于taskExecutor内Thread的name
  * @param tickMs 时间精度(最底层时间轮一个单元格的时间跨度)
@@ -78,6 +80,10 @@ class SystemTimer(executorName: String,
       KafkaThread.nonDaemon("executor-"+executorName, runnable)
   })
 
+  /**
+   * jdk提供的延时队列, 是时间轮模块"定时"能力的来源.
+   * 该延时队列被各层级时间轮所共用.
+   */
   private[this] val delayQueue = new DelayQueue[TimerTaskList]()
   /**
    * 任务总数计数器,

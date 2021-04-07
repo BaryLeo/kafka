@@ -95,7 +95,17 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * This class is not thread-safe. There should not be any add calls while advanceClock is executing.
  * It is caller's responsibility to enforce it. Simultaneous add calls are thread-safe.
-
+ *
+ * 时间轮每个元素存储的是TimerTaskList对象, 具体见buckets属性.
+ * 时间轮每一项也有其所表示的到期时间范围(如[20ms~40ms]), 只有到期时间在该范围内的TimerTask才会放到对应的bucket中.
+ * ------
+ * 事件轮存在的目的很纯粹: 降低新定时任务插入时的时间复杂度.
+ * JDK提供的DelayQueue使用"堆"来管理定时任务, 向其中插入新定时任务的时间复杂度为 O(nlog(n)).
+ * 时间轮的思想是:
+ *   DelayQueue照用不误, 但不在其中直接存储单个任务, 而是存储任务队列对象.
+ *   这样用花费一次O(nlog(n))成本将任务队列插入DelayQueue后, 后续多个定时任务只要花费O(1)来插入到对应的队列就好了.
+ *   其实时间轮的本质就是一个"Hash算法", 输入一个TimerTask, 时间轮将其定位到其所应该对应的任务队列(TimerTaskList).
+ *
  *
  * @param tickMs 单个时间单元格代表的时间跨度
  * @param wheelSize 当前时间轮的单元格数量
@@ -185,6 +195,8 @@ private[timer] class TimingWheel(tickMs: Long, wheelSize: Int, startMs: Long, ta
   /**
    * Try to advance the clock.
    * 推进当前时间轮的currentTime指针.
+   *
+   * 调用点: kafka.utils.timer.SystemTimer#advanceClock(long)
    *
    * @param timeMs 当前时间戳
    */

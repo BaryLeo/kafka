@@ -25,6 +25,9 @@ import org.apache.kafka.common.utils.Time
 import scala.math._
 
 /**
+ * 定时任务列表, Delayed子类, 会被插入DelayQueue中.
+ * 定时任务会先被封装成TimerTaskEntry, 然后插入该定时任务列表.
+ *
  * TimerTaskList整体有一个"到期时间",
  * 其内存储的TimerTaskEntry也有各自的"到期时间".
  *

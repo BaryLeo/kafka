@@ -510,12 +510,14 @@ class ReplicaManager(val config: KafkaConfig,
                     responseCallback: Map[TopicPartition, PartitionResponse] => Unit,
                     delayedProduceLock: Option[Lock] = None,
                     recordConversionStatsCallback: Map[TopicPartition, RecordConversionStats] => Unit = _ => ()) {
+    // 校验传入的acks的值是否在正确范围(-1,1,0)
     if (isValidRequiredAcks(requiredAcks)) {
       val sTime = time.milliseconds
+      // 将消息写入本地Log中
       val localProduceResults = appendToLocalLog(internalTopicsAllowed = internalTopicsAllowed,
         isFromClient = isFromClient, entriesPerPartition, requiredAcks)
       debug("Produce to local log in %d ms".format(time.milliseconds - sTime))
-
+      // 转换结果对象
       val produceStatus = localProduceResults.map { case (topicPartition, result) =>
         topicPartition ->
           ProducePartitionStatus(
@@ -526,7 +528,7 @@ class ReplicaManager(val config: KafkaConfig,
       recordConversionStatsCallback(localProduceResults.mapValues(_.info.recordConversionStats))
 
       /*
-       * 判定是否需要创建DelayProduce, 标准如下
+       * 判定是否需要创建DelayProduce, 标准如下(需要全部满足):
        *   a. required acks = -1
        *   b. there is data to append
        *   c. at least one partition append was successful (fewer errors than partitions)
@@ -792,7 +794,9 @@ class ReplicaManager(val config: KafkaConfig,
           Some(new InvalidTopicException(s"Cannot append to internal topic ${topicPartition.topic}"))))
       } else {
         try {
+          // 若本Broker节点不承载对应partition的主副本, 这步会抛异常
           val (partition, _) = getPartitionAndLeaderReplicaIfLocal(topicPartition)
+          // 将消息写入对应Partition主副本, 并唤醒相关的等待操作(比如, 消费等待)
           val info = partition.appendRecordsToLeader(records, isFromClient, requiredAcks)
           val numAppendedMessages = info.numMessages
 
