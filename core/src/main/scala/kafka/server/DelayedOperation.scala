@@ -99,12 +99,16 @@ abstract class DelayedOperation(override val delayMs: Long,
 
   /**
    * Call-back to execute when a delayed operation gets expired and hence forced to complete.
+   *
+   * 超时后的业务逻辑
    */
   def onExpiration(): Unit
 
   /**
    * Process for completing an operation; This function needs to be defined
    * in subclasses and will be called exactly once in forceComplete()
+   *
+   * 实际业务逻辑
    */
   def onComplete(): Unit
 
@@ -114,6 +118,8 @@ abstract class DelayedOperation(override val delayMs: Long,
    * forceComplete() and return true iff forceComplete returns true; otherwise return false
    *
    * This function needs to be defined in subclasses
+   *
+   * 这里检查DelayedOperation的事件触发条件
    */
   def tryComplete(): Boolean
 
@@ -178,6 +184,12 @@ object DelayedOperationPurgatory {
 
 /**
  * A helper purgatory class for bookkeeping delayed operations with a timeout, and expiring timed out operations.
+ *
+ * 将DelayedOperation按key组织起来, key一般表示其所等待的事件类型, 一个key下可以挂多个DelayedOperation, 表示等待统一类事件. key
+ * 可以为任意类型对象.
+ * 对于DelayedOperation的两种触发途径, DelayedOperationPurgatory的支持如下:
+ * 1. 事件触发: kafka.server.DelayedOperationPurgatory#checkAndComplete(java.lang.Object);
+ * 2. 超时触发: ExpiredOperationReaper线程异步超时检测, 见expirationReaper属性;
  */
 final class DelayedOperationPurgatory[T <: DelayedOperation](purgatoryName: String,
                                                              timeoutTimer: Timer,
@@ -195,7 +207,13 @@ final class DelayedOperationPurgatory[T <: DelayedOperation](purgatoryName: Stri
   // the number of estimated total operations in the purgatory
   private[this] val estimatedTotalOperations = new AtomicInteger(0)
 
-  /* background thread expiring operations that have timed out */
+  /**
+   *  background thread expiring operations that have timed out
+   *
+   *  ShutdownableThread实例, 异步检测超时的DelayedOperation, 并执行其超时逻辑.
+   *  该线程的逻辑也很简单, 就是不间断地以200ms为timeout调用
+   *  kafka.server.DelayedOperationPurgatory#advanceClock(long)
+   */
   private val expirationReaper = new ExpiredOperationReaper()
 
   private val metricsTags = Map("delayedOperation" -> purgatoryName)

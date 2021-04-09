@@ -129,9 +129,12 @@ class SystemTimer(executorName: String,
    * Advances the clock if there is an expired bucket. If there isn't any expired bucket when called,
    * waits up to timeoutMs before giving up.
    *
-   * 推进currentTime. 若产生了到期任务, 则交由taskExecutor来执行.
+   * 尝试从delayQueue中取到期的TimerTaskList,
+   * 若取到, 则对timingWheel进行advanceClock.
    *
-   * @param timeoutMs 等待单元格到期的最大阻塞时间
+   * 被调用点: kafka.server.DelayedOperationPurgatory#advanceClock(long)
+   *
+   * @param timeoutMs 从delayQueue取到期的TimerTaskList时的最大阻塞时间
    */
   def advanceClock(timeoutMs: Long): Boolean = {
     var bucket = delayQueue.poll(timeoutMs, TimeUnit.MILLISECONDS)
