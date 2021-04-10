@@ -105,6 +105,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *   DelayQueue照用不误, 但不在其中直接存储单个任务, 而是存储任务队列对象.
  *   这样用花费一次O(nlog(n))成本将任务队列插入DelayQueue后, 后续多个定时任务只要花费O(1)来插入到对应的队列就好了.
  *   其实时间轮的本质就是一个"Hash算法", 输入一个TimerTask, 时间轮将其定位到其所应该对应的任务队列(TimerTaskList).
+ *   时间轮只管hash, 不管"任务过期"的逻辑, 其currentTime也仅仅是为正确hash而设立的.
  *
  *
  * @param tickMs 单个时间单元格代表的时间跨度
