@@ -51,6 +51,10 @@ case class ProduceMetadata(produceRequiredAcks: Short,
  * A delayed produce operation that can be created by the replica manager and watched
  * in the produce operation purgatory
  *
+ * DelayedProduce的两个触发条件:
+ * 1. 事件满足: (onComplete()) 当涉及的所有Partition都满足了副本数量要求, 给生产者发送响应;
+ * 2. 等待超时: (onExpiration()) 若在设定时间内事件未满足, 则记录监控metrics, 且不会给生产者任何响应;
+ *
  * @param produceMetadata 用于判断是否达到返回Success响应的条件
  */
 class DelayedProduce(delayMs: Long,
