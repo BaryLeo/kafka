@@ -49,6 +49,12 @@ import scala.math._
  *   b. TimeIndex;
  *   c. TransactionIndex
  *
+ * 其中, OffsetIndex保存"相对offset"到物理偏移量的映射(相对offset指的是对baseOffset的偏移量);
+ * 且offsetIndex为稀疏索引, 不会包含每条消息的信息, 隔几条消息才会插入一条IndexEntry;
+ * TimeIndex保存时间戳到"相对offset"的映射, 同样是稀疏索引, 隔几条消息才会插入一条IndexEntry.
+ *
+ * OffsetIndex和TimeIndex的格式也很简单, KVKVKV...追加.
+ *
  * @param log The file records containing log entries(日志分段数据文件)
  * @param offsetIndex The offset index(日志分段索引文件)
  * @param timeIndex The timestamp index(时间戳索引)

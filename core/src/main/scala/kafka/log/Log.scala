@@ -814,6 +814,7 @@ class Log(@volatile var dir: File,
       // 3. they are valid, insert them in the log
       lock synchronized {
         checkIfMemoryMappedBufferClosed()
+        // 根据是否assignOffsets来填充appendInfo的一些属性
         if (assignOffsets) {
           // assign offsets to the message set
           val offset = new LongRef(nextOffsetMetadata.messageOffset)
@@ -913,7 +914,7 @@ class Log(@volatile var dir: File,
           messageOffset = appendInfo.firstOrLastOffsetOfFirstBatch,
           segmentBaseOffset = segment.baseOffset,
           relativePositionInSegment = segment.size)
-
+        // 将消息插入segment
         segment.append(largestOffset = appendInfo.lastOffset,
           largestTimestamp = appendInfo.maxTimestamp,
           shallowOffsetOfMaxTimestamp = appendInfo.offsetOfMaxTimestamp,
