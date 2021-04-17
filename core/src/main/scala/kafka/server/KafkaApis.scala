@@ -498,6 +498,9 @@ class KafkaApis(val requestChannel: RequestChannel,
 
   /**
    * Handle a fetch request
+   *
+   * 备注:
+   * 1. FetchRequest不检查Group是否处于Rebalance过程中, 永远都可以通过FetchRequest拉数据;
    */
   def handleFetchRequest(request: RequestChannel.Request) {
     val versionId = request.header.apiVersion
