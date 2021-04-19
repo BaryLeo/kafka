@@ -68,7 +68,25 @@ import java.util.concurrent.atomic.AtomicInteger;
  * ConsumerCoordinator类负责与GroupCoordinator交互, 具体核心职责包括:
  *   1. 向GroupCoordinator进行OffsetCommit;
  *   2. 向GroupCoordinator发送心跳(见 AbstractCoordinator);
- *   2. Rebalance过程中和GroupCoordinator通信;
+ *   3. Rebalance过程中和GroupCoordinator通信;
+ *
+ * 关于Rebalance.
+ * Consumer有2种方式感知"需要Rebalance":
+ *   1. HeartbeatResponse;
+ *   2. OffsetCommitResponse;
+ * 若ConsumerGroup处于Rebalance过程中, 以上2中过程会直接返回异常.
+ * ConsumerCoordinator会将rejoinNeeded(继承于AbstractCoordinator)属性置为true.
+ * KafkaConsumer在poll时会检查该状态, 若为true, 则发起JoinGroupRequest, 开始Rebalance过程.
+ *
+ * 值得一提的是, FetchRequest不检查Group是否处于Rebalance过程中, 永远都可以通过FetchRequest拉数据.
+ * 那么也就是只有和GroupCoordinator交互的请求才会校验Rebalance状态.
+ * 细想想也合理. GroupCoordinator是__consumer_offsets中对应partition的主副本所在Broker,
+ * 而FetchRequest目标Broker可不一定是哪个.
+ *
+ * 那么就有几个特殊情况:
+ * 1. 对于Kafka维护offset的情况, 当ConsumerGroup处于Rebalance过程中时, 仍然可能会有个别Consumer在Fetch消息,
+ *    而这部分消息时无法进行OffsetCommit的;
+ * 2. 对于不在Kafka维护offset的情况, 合理设计的话, 可以屏蔽掉Rebalance过程造成的重复消费;
  *
  */
 public final class ConsumerCoordinator extends AbstractCoordinator {

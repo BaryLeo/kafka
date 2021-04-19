@@ -128,7 +128,8 @@ public abstract class AbstractCoordinator implements Closeable {
      */
     private HeartbeatThread heartbeatThread = null;
     /**
-     * 是否需要发送JoinGroupRequest
+     * 是否需要发送JoinGroupRequest.
+     * 对于消息消费领域, KafkaConsumer每次poll时都会检查该状态; 若为true, 则发起JoinGroupRequest开始Rebalance过程.
      */
     private boolean rejoinNeeded = true;
     /**
