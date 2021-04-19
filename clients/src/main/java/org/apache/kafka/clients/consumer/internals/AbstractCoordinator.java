@@ -90,6 +90,10 @@ import java.util.concurrent.atomic.AtomicReference;
  * state transitions are protected with the class's monitor. Generally this means acquiring the lock
  * before reading or writing the state of the group (e.g. generation, memberId) and holding the lock
  * when sending a request that affects the state of the group (e.g. JoinGroup, LeaveGroup).
+ *
+ * 有两个实现类:
+ * 1. 消息消费过程中的ConsumerCoordinator;
+ * 2. 流计算过程中的WorkerCoordinator;
  */
 public abstract class AbstractCoordinator implements Closeable {
     public static final String HEARTBEAT_THREAD_PREFIX = "kafka-coordinator-heartbeat-thread";

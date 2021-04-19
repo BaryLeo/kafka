@@ -64,6 +64,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * This class manages the coordination process with the consumer coordinator.
+ *
+ * ConsumerCoordinator类负责与GroupCoordinator交互, 具体核心职责包括:
+ *   1. 向GroupCoordinator进行OffsetCommit;
+ *   2. 向GroupCoordinator发送心跳(见 AbstractCoordinator);
+ *   2. Rebalance过程中和GroupCoordinator通信;
+ *
  */
 public final class ConsumerCoordinator extends AbstractCoordinator {
     private final Logger log;
@@ -367,6 +373,9 @@ public final class ConsumerCoordinator extends AbstractCoordinator {
                     elapsed = currentTime - startTime;
                 }
 
+                // 注意:
+                // 1. ensureActiveGroup内会视需要启动定时心跳线程;
+                // 2. ensureActiveGroup内会视需要向GroupCoordinator发送JoinGroupRequest, 开启Rebalance第一步.
                 if (!ensureActiveGroup(remainingTimeAtLeastZero(timeoutMs, elapsed))) {
                     return false;
                 }
