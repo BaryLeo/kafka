@@ -533,6 +533,7 @@ class GroupCoordinator(val brokerId: Int,
       } else if (!group.has(memberId)) {
         responseCallback(offsetMetadata.mapValues(_ => Errors.UNKNOWN_MEMBER_ID))
       } else if (generationId != group.generationId) {
+        // group版本检查
         responseCallback(offsetMetadata.mapValues(_ => Errors.ILLEGAL_GENERATION))
       } else {
         val member = group.get(memberId)

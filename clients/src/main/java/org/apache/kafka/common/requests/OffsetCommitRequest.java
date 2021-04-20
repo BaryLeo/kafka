@@ -128,6 +128,10 @@ public class OffsetCommitRequest extends AbstractRequest {
 
     private final String groupId;
     private final String memberId;
+    /**
+     * 指定目标ConsumerGroup的年代信息
+     * (每次JoinGroup阶段结束后, GroupCoordinator保存的GroupMetadata的值就会加1)
+     */
     private final int generationId;
     /**
      * 该offset信息的最长保留时间

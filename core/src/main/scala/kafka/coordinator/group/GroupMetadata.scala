@@ -179,6 +179,8 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
   var protocolType: Option[String] = None
   /**
    * 标识当前ConsumerGroup的年代信息
+   *
+   * 每次JoinGroup阶段结束后该值加1
    */
   var generationId = 0
   /**
