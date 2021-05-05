@@ -1004,6 +1004,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             int version = metadata.requestUpdate();
             sender.wakeup();
             try {
+                // 等待已获取的元数据版本大于version时返回, 等待时间超过remainingWaitMs时抛异常
                 metadata.awaitUpdate(version, remainingWaitMs);
             } catch (TimeoutException ex) {
                 // Rethrow with original maxWaitMs to prevent logging exception with remainingWaitMs
