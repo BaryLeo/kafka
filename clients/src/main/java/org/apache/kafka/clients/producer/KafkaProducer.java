@@ -884,7 +884,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // first make sure the metadata for the topic is available
             ClusterAndWaitTime clusterAndWaitTime;
             try {
-                // 获取元数据和ProduceRequest一样走Sender线程
+                // 获取元数据和ProduceRequest一样走Sender线程, 这里等待元数据更新完毕
                 clusterAndWaitTime = waitOnMetadata(record.topic(), record.partition(), maxBlockTimeMs);
             } catch (KafkaException e) {
                 if (metadata.isClosed())
