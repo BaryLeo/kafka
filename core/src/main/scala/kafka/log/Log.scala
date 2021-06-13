@@ -242,7 +242,11 @@ class Log(@volatile var dir: File,
    */
   @volatile private var replicaHighWatermark: Option[Long] = None
 
-  /* the actual segments of the log */
+  /**
+   * the actual segments of the log
+   *
+   * key为对应LogSegment的起始offset
+   */
   private val segments: ConcurrentNavigableMap[java.lang.Long, LogSegment] = new ConcurrentSkipListMap[java.lang.Long, LogSegment]
 
   @volatile private var _leaderEpochCache: LeaderEpochFileCache = initializeLeaderEpochCache()
