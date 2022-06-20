@@ -160,6 +160,7 @@ public class Sender implements Runnable {
         // main loop, runs until close is called
         while (running) {
             try {
+                //执行run
                 run(time.milliseconds());
             } catch (Exception e) {
                 log.error("Uncaught error in kafka producer I/O thread: ", e);
@@ -171,6 +172,7 @@ public class Sender implements Runnable {
         // okay we stopped accepting requests but there may still be
         // requests in the accumulator or waiting for acknowledgment,
         // wait until these are completed.
+        //关闭client后，且非强制close，还需要继续处理剩余的batch data
         while (!forceClose && (this.accumulator.hasUndrained() || this.client.inFlightRequestCount() > 0)) {
             try {
                 run(time.milliseconds());
@@ -201,6 +203,7 @@ public class Sender implements Runnable {
     void run(long now) {
         if (transactionManager != null) {
             try {
+                //处理事务相关逻辑
                 if (transactionManager.shouldResetProducerStateAfterResolvingSequences())
                     // Check if the previous run expired batches which requires a reset of the producer state.
                     transactionManager.resetProducerId();
@@ -222,10 +225,13 @@ public class Sender implements Runnable {
                 if (transactionManager.hasFatalError() || !transactionManager.hasProducerId()) {
                     RuntimeException lastError = transactionManager.lastError();
                     if (lastError != null)
+                        //发送异常的话，执行判断，如果不在待发送的list中，就抛弃该batch
                         maybeAbortBatches(lastError);
+                    //执行真正的发送方法
                     client.poll(retryBackoffMs, now);
                     return;
                 } else if (transactionManager.hasAbortableError()) {
+                    //抛弃msg流程中发生了异常，则使用兜底的抛弃方法
                     accumulator.abortUndrainedBatches(transactionManager.lastError());
                 }
             } catch (AuthenticationException e) {

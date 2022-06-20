@@ -23,10 +23,7 @@ import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.errors.DisconnectException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.metrics.Sensor;
-import org.apache.kafka.common.network.ChannelState;
-import org.apache.kafka.common.network.NetworkReceive;
-import org.apache.kafka.common.network.Selectable;
-import org.apache.kafka.common.network.Send;
+import org.apache.kafka.common.network.*;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.protocol.CommonFields;
@@ -74,6 +71,9 @@ public class NetworkClient implements KafkaClient {
     private final Logger log;
 
     /* the selector used to perform network i/o */
+    /**
+     * 封装了Java的selector组件，{@link Selector}
+     */
     private final Selectable selector;
 
     private final MetadataUpdater metadataUpdater;
@@ -413,6 +413,10 @@ public class NetworkClient implements KafkaClient {
     }
 
     /**
+     * send方法很有迷惑性。乍一看，觉得其业务逻辑是将request同步发送出去。
+     * 然而，send方法其实并不实际执行向网络端口写数据的动作，只是将请求"暂存"起来。poll方法才是实际执行读写动作的地方(NIO)。
+     * 当请求的目标channel可写时，{@link NetworkClient#poll(long, long)}方法会实际执行发送动作；
+     * 当channel有数据可读时，poll方法读取响应，并做对应处理。
      * Queue up the given request for sending. Requests can only be sent out to ready nodes.
      * @param request The request
      * @param now The current timestamp
@@ -508,8 +512,9 @@ public class NetworkClient implements KafkaClient {
      */
     @Override
     public List<ClientResponse> poll(long timeout, long now) {
+        //判断网络组件是否正常运行中
         ensureActive();
-
+        //如果抛弃list中不为空，则默认这些request是已完成
         if (!abortedSends.isEmpty()) {
             // If there are aborted sends because of unsupported version exceptions or disconnects,
             // handle them immediately without waiting for Selector#poll.
@@ -531,12 +536,12 @@ public class NetworkClient implements KafkaClient {
         long updatedNow = this.time.milliseconds();
         List<ClientResponse> responses = new ArrayList<>();
         handleCompletedSends(responses, updatedNow);
-        handleCompletedReceives(responses, updatedNow);
-        handleDisconnections(responses, updatedNow);
-        handleConnections();
+        handleCompletedReceives(responses, updatedNow);//处理完成后的server端返回的数据
+        handleDisconnections(responses, updatedNow);//关闭此处使用的连接
+        handleConnections();//将链接重置为可用状态
         handleInitiateApiVersionRequests(updatedNow);
-        handleTimedOutRequests(responses, updatedNow);
-        completeResponses(responses);
+        handleTimedOutRequests(responses, updatedNow);//处理timeOut的request
+        completeResponses(responses);//处理已完成发送的后置增强逻辑
 
         return responses;
     }

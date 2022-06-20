@@ -61,6 +61,8 @@ public interface ProducerInterceptor<K, V> extends Configurable {
      * is caught, logged, and the next interceptor is called with the record returned by the last successful interceptor in the list,
      * or otherwise the client.
      *
+     *  消息在发送前的回调，可在这里做一些消息变更逻辑(如加减字段等)。
+     *
      * @param record the record from client or the record returned by the previous interceptor in the chain of interceptors.
      * @return producer record to send to topic/partition
      */
@@ -77,6 +79,7 @@ public interface ProducerInterceptor<K, V> extends Configurable {
      * <p>
      * This method will generally execute in the background I/O thread, so the implementation should be reasonably fast.
      * Otherwise, sending of messages from other threads could be delayed.
+     * 这个是得到Server端正确响应时的回调
      *
      * @param metadata The metadata for the record that was sent (i.e. the partition and offset).
      *                 If an error occurred, metadata will contain only valid topic and maybe

@@ -55,17 +55,20 @@ public class DefaultPartitioner implements Partitioner {
         List<PartitionInfo> partitions = cluster.partitionsForTopic(topic);
         int numPartitions = partitions.size();
         if (keyBytes == null) {
+            //如果指定的分区key的bytes数组是null，则使用取模的方式进行路由
             int nextValue = nextValue(topic);
             List<PartitionInfo> availablePartitions = cluster.availablePartitionsForTopic(topic);
             if (availablePartitions.size() > 0) {
+                //可以看看这个toPositive方法,位运算后根据partition的数量进行取模
                 int part = Utils.toPositive(nextValue) % availablePartitions.size();
                 return availablePartitions.get(part).partition();
             } else {
                 // no partitions are available, give a non-available partition
+                //兜底，使用随意的partition的num
                 return Utils.toPositive(nextValue) % numPartitions;
             }
         } else {
-            // hash the keyBytes to choose a partition
+            // 使用murmur2的算法，把任意数据类型的key转换为int类型，然后再取模路由
             return Utils.toPositive(Utils.murmur2(keyBytes)) % numPartitions;
         }
     }

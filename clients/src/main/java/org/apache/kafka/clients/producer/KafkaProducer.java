@@ -862,8 +862,10 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      */
     @Override
     public Future<RecordMetadata> send(ProducerRecord<K, V> record, Callback callback) {
+        /** interceptors - > ProducerInterceptor 这个是接口，可以先看看这个接口 {@link org.apache.kafka.clients.producer.ProducerInterceptor} */
         // intercept the record, which can be potentially modified; this method does not throw exceptions
         ProducerRecord<K, V> interceptedRecord = this.interceptors.onSend(record);
+        //执行完增强方法后，执行真正的发送逻辑
         return doSend(interceptedRecord, callback);
     }
 
@@ -884,7 +886,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // first make sure the metadata for the topic is available
             ClusterAndWaitTime clusterAndWaitTime;
             try {
-                // 获取元数据和ProduceRequest一样走Sender线程, 这里等待元数据更新完毕
+                // 获取元数据和ProduceRequest一样走Sender线程, 这里等待元数据更新完毕,更新完后，sender线程会notifyAll，唤醒所有线程
                 clusterAndWaitTime = waitOnMetadata(record.topic(), record.partition(), maxBlockTimeMs);
             } catch (KafkaException e) {
                 if (metadata.isClosed())
@@ -892,7 +894,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                 throw e;
             }
             long remainingWaitMs = Math.max(0, maxBlockTimeMs - clusterAndWaitTime.waitedOnMetadataMs);
+            //拿到新的数据
             Cluster cluster = clusterAndWaitTime.cluster;
+            //将要发送的数据进行序列化
             byte[] serializedKey;
             try {
                 serializedKey = keySerializer.serialize(record.topic(), record.headers(), record.key());
@@ -909,30 +913,34 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                         " to class " + producerConfig.getClass(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG).getName() +
                         " specified in value.serializer", cce);
             }
+            //选择partition
             int partition = partition(record, serializedKey, serializedValue, cluster);
             tp = new TopicPartition(record.topic(), partition);
-
+            //设置是否只读，通过record的header配置
             setReadOnly(record.headers());
             Header[] headers = record.headers().toArray();
-
+            //计算序列化后的size
             int serializedSize = AbstractRecords.estimateSizeInBytesUpperBound(apiVersions.maxUsableProduceMagic(),
                     compressionType, serializedKey, serializedValue, headers);
+            //校验数据的size是否符合配置要求
             ensureValidRecordSize(serializedSize);
             long timestamp = record.timestamp() == null ? time.milliseconds() : record.timestamp();
             log.trace("Sending record {} with callback {} to topic {} partition {}", record, callback, record.topic(), partition);
             // producer callback will make sure to call both 'callback' and interceptor callback
+            //创建callback
             Callback interceptCallback = new InterceptorCallback<>(callback, this.interceptors, tp);
-
+            // 事务相关逻辑,如果开启了事务，将TopicPartition信息塞进transactionManager，由它判断是不是事务，如果是就更新记录，否则无事发生
             if (transactionManager != null && transactionManager.isTransactional())
                 transactionManager.maybeAddPartitionToTransaction(tp);
-
+            //把这条消息加入RecordAccumulator缓冲区中
             RecordAccumulator.RecordAppendResult result = accumulator.append(tp, timestamp, serializedKey,
                     serializedValue, headers, interceptCallback, remainingWaitMs);
-            // 当前消息追加RecordAccumulator里面后,所在批次已满或溢出,唤醒send线程来消费数据
+            //当前消息追加RecordAccumulator里面后,所在批次已满或溢出,唤醒send线程来消费数据
             if (result.batchIsFull || result.newBatchCreated) {
                 log.trace("Waking up the sender since topic {} partition {} is either full or getting a new batch", record.topic(), partition);
                 this.sender.wakeup();
             }
+            //返回执行的future
             return result.future;
             // handling exceptions and record the errors;
             // for API exceptions return them in the future,
@@ -980,14 +988,16 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      */
     private ClusterAndWaitTime waitOnMetadata(String topic, Integer partition, long maxWaitMs) throws InterruptedException {
         // add topic to metadata topic list if it is not there already and reset expiry
+        // 把需要更新的topic塞进metadata的list，如果这个topic是新的，metadata会执行更新，详细看这个add()方法
         metadata.add(topic);
         Cluster cluster = metadata.fetch();
-        Integer partitionsCount = cluster.partitionCountForTopic(topic);
+        Integer partitionsCount = cluster.partitionCountForTopic(topic);//获得目标topic的partition数量
         // Return cached metadata if we have it, and if the record's partition is either undefined
         // or within the known partition range
+        // 如果已经有partition的信息，直接返回这个数据
         if (partitionsCount != null && (partition == null || partition < partitionsCount))
             return new ClusterAndWaitTime(cluster, 0);
-
+        // 没有partition的信息，等待刷新
         long begin = time.milliseconds();
         long remainingWaitMs = maxWaitMs;
         long elapsed;
@@ -1002,7 +1012,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             }
             metadata.add(topic);
             int version = metadata.requestUpdate();
-            sender.wakeup();
+            sender.wakeup();//中断sender的休眠状态
             try {
                 // 等待已获取的元数据版本大于version时返回, 等待时间超过remainingWaitMs时抛异常
                 metadata.awaitUpdate(version, remainingWaitMs);
@@ -1012,7 +1022,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                         String.format("Topic %s not present in metadata after %d ms.",
                                 topic, maxWaitMs));
             }
-            cluster = metadata.fetch();
+            cluster = metadata.fetch();//抓取缓存
             elapsed = time.milliseconds() - begin;
             if (elapsed >= maxWaitMs) {
                 throw new TimeoutException(partitionsCount == null ?
@@ -1024,9 +1034,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             if (cluster.unauthorizedTopics().contains(topic))
                 throw new TopicAuthorizationException(topic);
             remainingWaitMs = maxWaitMs - elapsed;
-            partitionsCount = cluster.partitionCountForTopic(topic);
-        } while (partitionsCount == null || (partition != null && partition >= partitionsCount));
-
+            partitionsCount = cluster.partitionCountForTopic(topic);//判断是否获得目标topic
+        } while (partitionsCount == null || (partition != null && partition >= partitionsCount));//一直更新，直到获取到目标数据
+        //返回最新的数据，以及拉取数据的耗时
         return new ClusterAndWaitTime(cluster, elapsed);
     }
 
