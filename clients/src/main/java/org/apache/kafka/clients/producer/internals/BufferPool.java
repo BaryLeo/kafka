@@ -43,11 +43,13 @@ import org.apache.kafka.common.utils.Time;
  */
 public class BufferPool {
 
+    //BufferPool里是有一个Deque作为队列，缓存了一些ByteBuffer，也就是缓存了一批内存空间，可以用来复用的，就是说他会缓存一批ByteBuffer，每个ByteBuffer都是16kb，默认的batch大小
     static final String WAIT_TIME_SENSOR_NAME = "bufferpool-wait-time";
 
     private final long totalMemory;
     private final int poolableSize;
     private final ReentrantLock lock;
+    //Dequeu里的ByteBuffer的数量 * 16kb = 已经缓存的内存空间的大小，0
     private final Deque<ByteBuffer> free;
     private final Deque<Condition> waiters;
     /** Total available memory is the sum of nonPooledAvailableMemory and the number of byte buffers in free * poolableSize.  */
@@ -106,6 +108,7 @@ public class BufferPool {
         this.lock.lock();
         try {
             // check if we have a free buffer of the right size pooled
+            // 如果内存队列中存在空闲的内存，直接返回，其实这里是使用了double check，避免重复申请分配内存
             if (size == poolableSize && !this.free.isEmpty())
                 return this.free.pollFirst();
 
@@ -115,10 +118,12 @@ public class BufferPool {
             if (this.nonPooledAvailableMemory + freeListSize >= size) {
                 // we have enough unallocated or pooled memory to immediately
                 // satisfy the request, but need to allocate the buffer
+                // 当可用内存大于这个消息的size的时候，就进行一次内存释放，然后再分配buffer
                 freeUp(size);
                 this.nonPooledAvailableMemory -= size;
             } else {
                 // we are out of memory and will have to block
+                // 当内存溢出的时候，就执行block
                 int accumulated = 0;
                 Condition moreMemory = this.lock.newCondition();
                 try {

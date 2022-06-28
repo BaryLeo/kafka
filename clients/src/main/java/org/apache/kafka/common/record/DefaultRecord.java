@@ -171,6 +171,7 @@ public class DefaultRecord implements Record {
 
     /**
      * Write the record to `out` and return its size.
+     * 整体来说，是将数据写到真正的内存当中，格式以utf-8的byte流
      */
     public static int writeTo(DataOutputStream out,
                               int offsetDelta,

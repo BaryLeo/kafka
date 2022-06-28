@@ -424,6 +424,7 @@ public final class LegacyRecord {
                              TimestampType timestampType) throws IOException {
         byte attributes = computeAttributes(magic, compressionType, timestampType);
         long crc = computeChecksum(magic, attributes, timestamp, key, value);
+        //执行写入
         write(out, magic, crc, attributes, timestamp, key, value);
         return crc;
     }

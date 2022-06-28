@@ -429,6 +429,7 @@ public class MemoryRecordsBuilder {
                 appendDefaultRecord(offset, timestamp, key, value, headers);
                 return null;
             } else {
+                //一般都是走这个方法
                 return appendLegacyRecord(offset, timestamp, key, value);
             }
         } catch (IOException e) {
@@ -516,6 +517,7 @@ public class MemoryRecordsBuilder {
      * @return CRC of the record or null if record-level CRC is not supported for the message format
      */
     public Long append(long timestamp, ByteBuffer key, ByteBuffer value, Header[] headers) {
+        //1、获取offset；2，根据kafka协议，封装消息体
         return appendWithOffset(nextSequentialOffset(), timestamp, key, value, headers);
     }
 
@@ -637,9 +639,13 @@ public class MemoryRecordsBuilder {
     private void appendDefaultRecord(long offset, long timestamp, ByteBuffer key, ByteBuffer value,
                                      Header[] headers) throws IOException {
         ensureOpenForRecordAppend();
+        //offset
         int offsetDelta = (int) (offset - baseOffset);
+        //消息时间
         long timestampDelta = timestamp - firstTimestamp;
+        //执行封装，写到内存中
         int sizeInBytes = DefaultRecord.writeTo(appendStream, offsetDelta, timestampDelta, key, value, headers);
+        //执行封装后的一些善后工作，例如调整offset
         recordWritten(offset, timestamp, sizeInBytes);
     }
 
@@ -647,12 +653,15 @@ public class MemoryRecordsBuilder {
         ensureOpenForRecordAppend();
         if (compressionType == CompressionType.NONE && timestampType == TimestampType.LOG_APPEND_TIME)
             timestamp = logAppendTime;
-
+        //计算record size
         int size = LegacyRecord.recordSize(magic, key, value);
+        //写入header
         AbstractLegacyRecordBatch.writeHeader(appendStream, toInnerOffset(offset), size);
 
         if (timestampType == TimestampType.LOG_APPEND_TIME)
             timestamp = logAppendTime;
+        //写入并且计算crc,attributes
+        // offset | size | crc | magic | attibutes | timestamp | key size | key | value size | value
         long crc = LegacyRecord.write(appendStream, magic, timestamp, key, value, CompressionType.NONE, timestampType);
         recordWritten(offset, timestamp, size + Records.LOG_OVERHEAD);
         return crc;

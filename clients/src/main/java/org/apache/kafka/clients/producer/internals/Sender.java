@@ -248,12 +248,16 @@ public class Sender implements Runnable {
     }
 
     private long sendProducerData(long now) {
+        //执行到这里的时候，在之前已经把Topic对应的元数据拉取到客户端来缓存了，Topic -> Partitions -> Leader/Follower + ISR
         Cluster cluster = metadata.fetch();
 
         // get the list of partitions with data ready to send
+        //获取已经可以发送消息的那些Partition：哪些Partition有已经写满的batch（16kb），
+        //或者batch创建的时间已经超过了linger.ms，此时这个Partition就有可以发送出去的batch了，收集出来Partition Leader所在的Broker
         RecordAccumulator.ReadyCheckResult result = this.accumulator.ready(cluster, now);
 
         // if there are any partitions whose leaders are not known yet, force metadata update
+        //如果说有一些Partition对应的元数据都没拉取到，此时就必须标识一下，必须要在后面去尝试拉取元数据
         if (!result.unknownLeaderTopics.isEmpty()) {
             // The set of topics with unknown leader contains topics with leader election pending as well as
             // topics which may have expired. Add the topic again to metadata to ensure it is included
@@ -267,10 +271,12 @@ public class Sender implements Runnable {
         }
 
         // remove any nodes we aren't ready to send to
+        //检查一下是否准备好可以向那些Borker发送数据了,未能建立连接的直接过滤不发送
         Iterator<Node> iter = result.readyNodes.iterator();
         long notReadyTimeout = Long.MAX_VALUE;
         while (iter.hasNext()) {
             Node node = iter.next();
+            //这里检查的时候，发现未连接的时候，会尝试建立连接
             if (!this.client.ready(node, now)) {
                 iter.remove();
                 notReadyTimeout = Math.min(notReadyTimeout, this.client.pollDelayMs(node, now));
@@ -278,6 +284,8 @@ public class Sender implements Runnable {
         }
 
         // create produce requests
+        //有很多Partiton可以发送数据，有一些Partition Leader是在同一个Broker上，
+        // 此时按照Broker对Partition进行分组，找到一个Broker对应的多个Partition的Batch，
         Map<Integer, List<ProducerBatch>> batches = this.accumulator.drain(cluster, result.readyNodes,
                 this.maxRequestSize, now);
         if (guaranteeMessageOrder) {
@@ -288,6 +296,7 @@ public class Sender implements Runnable {
             }
         }
 
+        // 如果一个batch已经在内存缓冲里停留超过60s，超时不要了
         List<ProducerBatch> expiredBatches = this.accumulator.expiredBatches(this.requestTimeoutMs, now);
         // Reset the producer id if an expired batch has previously been sent to the broker. Also update the metrics
         // for expired batches. see the documentation of @TransactionState.resetProducerId to understand why
@@ -665,6 +674,8 @@ public class Sender implements Runnable {
 
     /**
      * Create a produce request from the given record batches
+     * 对每个Broker都创建一个ClientReqeust，包括了多个Batch，就是在这个Broker上的多个Leader Partition所对应的Batch，
+     * 聚合起来组成一个ClientRequest，形成一个请求，发送到Broker上去
      */
     private void sendProduceRequest(long now, int destination, short acks, int timeout, List<ProducerBatch> batches) {
         if (batches.isEmpty())
